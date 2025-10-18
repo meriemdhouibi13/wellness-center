@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wellness Center - Developer Console</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .status {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .status.connected {
+      border-left: 4px solid #10b981;
+    }
+
+    .status.disconnected {
+      border-left: 4px solid #ef4444;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .card h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-icon {
+      font-size: 24px;
+    }
+
+    .button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      width: 100%;
+      margin-top: 10px;
+      transition: all 0.2s;
+    }
+
+    .button:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .button:active {
+      transform: translateY(0);
+    }
+
+    .button.secondary {
+      background: #10b981;
+    }
+
+    .button.secondary:hover {
+      background: #059669;
+    }
+
+    .button.danger {
+      background: #ef4444;
+    }
+
+    .button.danger:hover {
+      background: #dc2626;
+    }
+
+    .input-group {
+      margin-top: 10px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    .input-group input,
+    .input-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .log {
+      background: #1e293b;
+      color: #10b981;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+
+    .log-entry {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-left: 2px solid #10b981;
+      padding-left: 10px;
+    }
+
+    .log-entry.error {
+      border-left-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .log-entry.info {
+      border-left-color: #3b82f6;
+      color: #3b82f6;
+    }
+
+    .timestamp {
+      color: #64748b;
+      font-size: 11px;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏋️ Wellness Center Developer Console</h1>
+      <p>Manual event triggers for demo and testing</p>
+    </div>
+
+    <div class="status disconnected" id="connectionStatus">
+      <strong>Status:</strong> Connecting to Firebase...
+    </div>
+
+    <div class="grid">
+      <!-- Equipment Control -->
+      <div class="card">
+        <h2><span class="card-icon">🏃</span> Equipment Control</h2>
+        <div class="input-group">
+          <label>Equipment ID</label>
+          <select id="equipmentSelect">
+            <option value="">Loading equipment...</option>
+          </select>
+        </div>
+        <button class="button secondary" onclick="startEquipmentSession()">▶️ Start Session</button>
+        <button class="button danger" onclick="endEquipmentSession()">⏹️ End Session</button>
+        <button class="button" onclick="toggleEquipmentStatus()">🔄 Toggle Status</button>
+      </div>
+
+      <!-- User Activity Simulation -->
+      <div class="card">
+        <h2><span class="card-icon">👤</span> User Activity</h2>
+        <div class="input-group">
+          <label>User ID</label>
+          <input type="text" id="userId" placeholder="user123" value="demo-user">
+        </div>
+        <div class="input-group">
+          <label>Activity Type</label>
+          <select id="activityType">
+            <option value="cardio">Cardio</option>
+            <option value="strength">Strength Training</option>
+            <option value="yoga">Yoga</option>
+            <option value="meditation">Meditation</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Duration (minutes)</label>
+          <input type="number" id="activityDuration" placeholder="30" value="30">
+        </div>
+        <button class="button" onclick="logActivity()">📝 Log Activity</button>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <h2><span class="card-icon">⚡</span> Quick Actions</h2>
+        <button class="button" onclick="refreshEquipment()">🔄 Refresh Equipment List</button>
+        <button class="button secondary" onclick="seedMockData()">🌱 Seed Mock Data</button>
+        <button class="button" onclick="simulateBusyPeriod()">🏢 Simulate Busy Period</button>
+        <button class="button danger" onclick="clearAllSessions()">🧹 Clear All Sessions</button>
+      </div>
+
+      <!-- Database Stats -->
+      <div class="card">
+        <h2><span class="card-icon">📊</span> Database Stats</h2>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="totalEquipment">-</div>
+            <div class="stat-label">Equipment</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="activeEquipment">-</div>
+            <div class="stat-label">In Use</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="availableEquipment">-</div>
+            <div class="stat-label">Available</div>
+          </div>
+        </div>
+        <button class="button" onclick="updateStats()">🔄 Refresh Stats</button>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card">
+      <h2><span class="card-icon">📋</span> Activity Log</h2>
+      <div class="log" id="activityLog">
+        <div class="log-entry info">
+          <span class="timestamp">[System]</span> Developer console initialized
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, query, where, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyB8ll3C9NdZtqcDrXM-Bv9CglIN_7LRxdE",
+      authDomain: "wellness-center-hackathon.firebaseapp.com",
+      projectId: "wellness-center-hackathon",
+      storageBucket: "wellness-center-hackathon.firebasestorage.app",
+      messagingSenderId: "82202466445",
+      appId: "1:82202466445:web:852d8363ef1f364957eac4",
+      measurementId: "G-8K08F9TY1P"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Make available globally
+    window.db = db;
+    window.firestoreModule = { collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, query, where, serverTimestamp };
+
+    // Log function
+    function log(message, type = 'success') {
+      const logEl = document.getElementById('activityLog');
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    window.log = log;
+
+    // Update connection status
+    document.getElementById('connectionStatus').className = 'status connected';
+    document.getElementById('connectionStatus').innerHTML = '<strong>Status:</strong> ✅ Connected to Firebase';
+    log('Connected to Firebase successfully', 'info');
+
+    // Load equipment on startup
+    loadEquipment();
+    updateStats();
+
+    // Load equipment list
+    async function loadEquipment() {
+      try {
+        const { collection, getDocs } = window.firestoreModule;
+        const equipmentRef = collection(window.db, 'equipment');
+        const snapshot = await getDocs(equipmentRef);
+        
+        const select = document.getElementById('equipmentSelect');
+        select.innerHTML = '<option value="">Select equipment...</option>';
+        
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const option = document.createElement('option');
+          option.value = doc.id;
+          option.textContent = `${data.name} (${data.type}) - ${data.status}`;
+          select.appendChild(option);
+        });
+        
+        log(`Loaded ${snapshot.size} equipment items`);
+      } catch (error) {
+        log(`Error loading equipment: ${error.message}`, 'error');
+      }
+    }
+
+    window.loadEquipment = loadEquipment;
+
+    // Update statistics
+    async function updateStats() {
+      try {
+        const { collection, getDocs } = window.firestoreModule;
+        const equipmentRef = collection(window.db, 'equipment');
+        const snapshot = await getDocs(equipmentRef);
+        
+        let total = 0;
+        let active = 0;
+        let available = 0;
+        
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          total++;
+          if (data.status === 'in_use') active++;
+          if (data.status === 'available') available++;
+        });
+        
+        document.getElementById('totalEquipment').textContent = total;
+        document.getElementById('activeEquipment').textContent = active;
+        document.getElementById('availableEquipment').textContent = available;
+        
+        log('Statistics updated');
+      } catch (error) {
+        log(`Error updating stats: ${error.message}`, 'error');
+      }
+    }
+
+    window.updateStats = updateStats;
+
+    // Start equipment session
+    window.startEquipmentSession = async function() {
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      if (!equipmentId) {
+        log('Please select equipment first', 'error');
+        return;
+      }
+
+      try {
+        const { doc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
+        
+        await updateDoc(equipmentRef, {
+          status: 'in_use',
+          currentUserId: document.getElementById('userId').value,
+          sessionStartTime: serverTimestamp()
+        });
+        
+        log(`✅ Started session on equipment: ${equipmentId}`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error starting session: ${error.message}`, 'error');
+      }
+    };
+
+    // End equipment session
+    window.endEquipmentSession = async function() {
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      if (!equipmentId) {
+        log('Please select equipment first', 'error');
+        return;
+      }
+
+      try {
+        const { doc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
+        
+        await updateDoc(equipmentRef, {
+          status: 'available',
+          currentUserId: null,
+          sessionStartTime: null,
+          lastUsedAt: serverTimestamp()
+        });
+        
+        log(`✅ Ended session on equipment: ${equipmentId}`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error ending session: ${error.message}`, 'error');
+      }
+    };
+
+    // Toggle equipment status
+    window.toggleEquipmentStatus = async function() {
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      if (!equipmentId) {
+        log('Please select equipment first', 'error');
+        return;
+      }
+
+      try {
+        const { doc, getDoc, updateDoc } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
+        const equipmentDoc = await getDoc(equipmentRef);
+        
+        if (!equipmentDoc.exists()) {
+          log('Equipment not found', 'error');
+          return;
+        }
+        
+        const currentStatus = equipmentDoc.data().status;
+        const newStatus = currentStatus === 'available' ? 'in_use' : 'available';
+        
+        await updateDoc(equipmentRef, { status: newStatus });
+        
+        log(`✅ Toggled equipment status to: ${newStatus}`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error toggling status: ${error.message}`, 'error');
+      }
+    };
+
+    // Log user activity
+    window.logActivity = async function() {
+      const userId = document.getElementById('userId').value;
+      const activityType = document.getElementById('activityType').value;
+      const duration = parseInt(document.getElementById('activityDuration').value);
+
+      if (!userId || !duration) {
+        log('Please fill in all fields', 'error');
+        return;
+      }
+
+      try {
+        const { collection, addDoc, serverTimestamp } = window.firestoreModule;
+        const activitiesRef = collection(window.db, 'activities');
+        
+        await addDoc(activitiesRef, {
+          userId,
+          type: activityType,
+          duration,
+          timestamp: serverTimestamp(),
+          completed: true
+        });
+        
+        log(`✅ Logged ${activityType} activity for ${userId} (${duration} mins)`, 'success');
+      } catch (error) {
+        log(`❌ Error logging activity: ${error.message}`, 'error');
+      }
+    };
+
+    // Refresh equipment list
+    window.refreshEquipment = async function() {
+      log('Refreshing equipment list...', 'info');
+      await loadEquipment();
+      await updateStats();
+    };
+
+    // Seed mock data
+    window.seedMockData = async function() {
+      log('Seeding mock data...', 'info');
+      
+      const mockEquipment = [
+        { id: 'treadmill-1', name: 'Treadmill A', type: 'cardio', status: 'available' },
+        { id: 'treadmill-2', name: 'Treadmill B', type: 'cardio', status: 'available' },
+        { id: 'bike-1', name: 'Stationary Bike 1', type: 'cardio', status: 'available' },
+        { id: 'weights-1', name: 'Dumbbell Set 1', type: 'strength', status: 'available' },
+        { id: 'weights-2', name: 'Barbell Station', type: 'strength', status: 'available' },
+        { id: 'yoga-1', name: 'Yoga Mat 1', type: 'yoga', status: 'available' },
+        { id: 'meditation-1', name: 'Meditation Room A', type: 'meditation', status: 'available' }
+      ];
+
+      try {
+        const { doc, setDoc, serverTimestamp } = window.firestoreModule;
+        
+        for (const equipment of mockEquipment) {
+          const equipmentRef = doc(window.db, 'equipment', equipment.id);
+          await setDoc(equipmentRef, {
+            ...equipment,
+            createdAt: serverTimestamp(),
+            lastUsedAt: null,
+            currentUserId: null
+          });
+        }
+        
+        log(`✅ Seeded ${mockEquipment.length} equipment items`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error seeding data: ${error.message}`, 'error');
+      }
+    };
+
+    // Simulate busy period
+    window.simulateBusyPeriod = async function() {
+      log('Simulating busy period...', 'info');
+      
+      try {
+        const { collection, getDocs, doc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = collection(window.db, 'equipment');
+        const snapshot = await getDocs(equipmentRef);
+        
+        let count = 0;
+        const promises = [];
+        
+        snapshot.forEach(docSnapshot => {
+          // Make 60% of equipment busy
+          if (Math.random() < 0.6) {
+            const equipRef = doc(window.db, 'equipment', docSnapshot.id);
+            promises.push(
+              updateDoc(equipRef, {
+                status: 'in_use',
+                currentUserId: `user-${Math.floor(Math.random() * 100)}`,
+                sessionStartTime: serverTimestamp()
+              })
+            );
+            count++;
+          }
+        });
+        
+        await Promise.all(promises);
+        
+        log(`✅ Set ${count} equipment items to busy`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error simulating busy period: ${error.message}`, 'error');
+      }
+    };
+
+    // Clear all sessions
+    window.clearAllSessions = async function() {
+      log('Clearing all sessions...', 'info');
+      
+      try {
+        const { collection, getDocs, doc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = collection(window.db, 'equipment');
+        const snapshot = await getDocs(equipmentRef);
+        
+        const promises = [];
+        
+        snapshot.forEach(docSnapshot => {
+          const equipRef = doc(window.db, 'equipment', docSnapshot.id);
+          promises.push(
+            updateDoc(equipRef, {
+              status: 'available',
+              currentUserId: null,
+              sessionStartTime: null,
+              lastUsedAt: serverTimestamp()
+            })
+          );
+        });
+        
+        await Promise.all(promises);
+        
+        log(`✅ Cleared ${snapshot.size} equipment sessions`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error clearing sessions: ${error.message}`, 'error');
+      }
+    };
+  </script>
+</body>
+</html>

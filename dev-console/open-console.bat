@@ -1,0 +1,3 @@
+@echo off
+echo Opening Wellness Center Developer Console...
+start "" "index.html"
