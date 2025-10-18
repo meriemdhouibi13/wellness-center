@@ -1,14 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { listSessions } from '@/services/sessions';
 
 export default function StatsScreen() {
-  const { user } = useAuth();
+  const [user, setUser] = useState<{ uid: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [totalSessions, setTotalSessions] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
   const [lastDate, setLastDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load user from session
+    AsyncStorage.getItem('auth:session').then((sessionStr) => {
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr);
+        setUser({ uid: session.uid });
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let mounted = true;

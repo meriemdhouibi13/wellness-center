@@ -1,10 +1,13 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { Link, Redirect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function SignInScreen() {
-  const { signIn, signUp, user, loading } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -12,18 +15,97 @@ export default function SignInScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (user && !loading) {
-    return <Redirect href="/(tabs)" />;
-  }
-
   const onSubmit = async () => {
-    setBusy(true); setError(null);
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter email and password');
+      return;
+    }
+    if (isSignUp && !name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+    
+    setBusy(true);
+    setError(null);
     try {
-      if (isSignUp) await signUp(email, password, name, 'member');
-      else await signIn(email, password);
+      const apiKey = (Constants.expoConfig?.extra?.firebaseApiKey as string) || '';
+      
+      if (isSignUp) {
+        // Sign up with Firebase Auth REST API
+        const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true })
+        });
+        const json = await resp.json();
+        if (!resp.ok) throw new Error(json.error?.message || 'Sign up failed');
+        
+        const uid = json.localId as string;
+        
+        // Create user profile in Firestore
+        if (db) {
+          await setDoc(doc(db, 'users', uid), {
+            id: uid,
+            name: name.trim(),
+            email: email.trim(),
+            role: 'member',
+            createdAt: Date.now(),
+          });
+        }
+        
+        // Save session
+        await AsyncStorage.setItem('auth:session', JSON.stringify({
+          uid,
+          email,
+          displayName: name.trim(),
+          idToken: json.idToken,
+          refreshToken: json.refreshToken,
+          expiresIn: Number(json.expiresIn || 3600),
+          createdAt: Date.now()
+        }));
+        await AsyncStorage.setItem('username', name.trim());
+        
+        router.replace('/(tabs)');
+      } else {
+        // Sign in with Firebase Auth REST API
+        const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true })
+        });
+        const json = await resp.json();
+        if (!resp.ok) throw new Error(json.error?.message || 'Sign in failed');
+        
+        const uid = json.localId as string;
+        
+        // Get user profile from Firestore
+        let displayName = email.split('@')[0];
+        if (db) {
+          const snap = await getDoc(doc(db, 'users', uid));
+          if (snap.exists()) {
+            displayName = snap.data().name || displayName;
+          }
+        }
+        
+        // Save session
+        await AsyncStorage.setItem('auth:session', JSON.stringify({
+          uid,
+          email,
+          displayName,
+          idToken: json.idToken,
+          refreshToken: json.refreshToken,
+          expiresIn: Number(json.expiresIn || 3600),
+          createdAt: Date.now()
+        }));
+        await AsyncStorage.setItem('username', displayName);
+        
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
-      setError(e?.message ?? 'Failed');
-    } finally { setBusy(false); }
+      setError(e?.message ?? 'Authentication failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -32,10 +114,29 @@ export default function SignInScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       <View style={styles.form}>
         {isSignUp && (
-          <TextInput value={name} onChangeText={setName} placeholder="Name" style={styles.input} />
+          <TextInput 
+            value={name} 
+            onChangeText={setName} 
+            placeholder="Name" 
+            style={styles.input}
+            autoCapitalize="words"
+          />
         )}
-        <TextInput value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" style={styles.input} />
-        <TextInput value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry style={styles.input} />
+        <TextInput 
+          value={email} 
+          onChangeText={setEmail} 
+          placeholder="Email" 
+          autoCapitalize="none"
+          keyboardType="email-address"
+          style={styles.input} 
+        />
+        <TextInput 
+          value={password} 
+          onChangeText={setPassword} 
+          placeholder="Password" 
+          secureTextEntry 
+          style={styles.input} 
+        />
         <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={busy}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isSignUp ? 'Sign up' : 'Sign in'}</Text>}
         </TouchableOpacity>
@@ -43,7 +144,9 @@ export default function SignInScreen() {
           <Text style={styles.link}>{isSignUp ? 'Have an account? Sign in' : "New here? Create an account"}</Text>
         </TouchableOpacity>
       </View>
-      <Link href="/(tabs)" style={styles.skip}>Skip for now →</Link>
+      <TouchableOpacity onPress={() => router.push('/(tabs)')}>
+        <Text style={styles.skip}>Skip for now →</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }

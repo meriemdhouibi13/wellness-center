@@ -61,21 +61,11 @@
       "firebaseAppId": "1:82202466445:web:852d8363ef1f364957eac4",
       "firebaseMeasurementId": "G-8K08F9TY1P",
       "currentDate": "2025-10-18 15:54:09",
-      "currentUser": "meriemdhouibi13",
-      "eas": {
-        "projectId": "wellness-center-hackathon"
-      }
+      "currentUser": "meriemdhouibi13"
     },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/wellness-center-hackathon",
-      "enabled": true
     }
   }
 }
