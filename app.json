@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "WellnessCenterApp",
+    "slug": "WellnessCenterApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "wellnesscenterapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "firebaseApiKey": "AIzaSyB8ll3C9NdZtqcDrXM-Bv9CglIN_7LRxdE",
+      "firebaseAuthDomain": "wellness-center-hackathon.firebaseapp.com",
+      "firebaseProjectId": "wellness-center-hackathon",
+      "firebaseStorageBucket": "wellness-center-hackathon.firebasestorage.app",
+      "firebaseMessagingSenderId": "82202466445",
+      "firebaseAppId": "1:82202466445:web:852d8363ef1f364957eac4",
+      "firebaseMeasurementId": "G-8K08F9TY1P"
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
