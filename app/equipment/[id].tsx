@@ -2,15 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface Equipment {
-  id: string;
-  name: string;
-  type: string;
-  status: 'available' | 'in_use';
-  description?: string;
-  location?: string;
-}
+import type { Equipment } from '@/services/types';
+import { getEquipment } from '@/services/equipment';
 
 export default function EquipmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,26 +13,22 @@ export default function EquipmentDetailScreen() {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    // TODO: Replace with actual Firebase query using the id parameter
-    // For now, using mock data
-    const mockEquipment: Record<string, Equipment> = {
-      '1': { id: '1', name: 'Treadmill A', type: 'cardio', status: 'available', description: 'High-speed treadmill with incline', location: 'Room 101' },
-      '2': { id: '2', name: 'Dumbbell Set', type: 'strength', status: 'in_use', description: '5lb - 50lb dumbbells', location: 'Room 102' },
-      '3': { id: '3', name: 'Yoga Mat', type: 'yoga', status: 'available', description: 'Non-slip yoga mat', location: 'Studio A' },
-      '4': { id: '4', name: 'Meditation Cushion', type: 'meditation', status: 'available', description: 'Comfortable meditation cushion', location: 'Meditation Room' },
-      '5': { id: '5', name: 'Stationary Bike', type: 'cardio', status: 'in_use', description: 'Stationary exercise bike', location: 'Room 101' },
-      '6': { id: '6', name: 'Barbell', type: 'strength', status: 'available', description: '50lb Olympic barbell', location: 'Room 102' },
-    };
-
-    // Simulate loading delay
-    const timer = setTimeout(() => {
-      if (id && mockEquipment[id]) {
-        setEquipment(mockEquipment[id]);
+    let isMounted = true;
+    (async () => {
+      if (!id) {
+        if (isMounted) setLoading(false);
+        return;
       }
-      setLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
+      try {
+        const item = await getEquipment(id as string);
+        if (isMounted) setEquipment(item);
+      } catch (e) {
+        console.error('Failed to load equipment', e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+    return () => { isMounted = false; };
   }, [id]);
 
   const getEquipmentIcon = () => {

@@ -2,38 +2,29 @@ import EquipmentCard from '@/components/EquipmentCard';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface Equipment {
-  id: string;
-  name: string;
-  type: string;
-  status: 'available' | 'in_use';
-}
+import type { Equipment } from '@/services/types';
+import { listEquipment } from '@/services/equipment';
 
 export default function EquipmentListScreen() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    // TODO: Replace with actual Firebase query
-    // For now, using mock data
-    const mockEquipment: Equipment[] = [
-      { id: '1', name: 'Treadmill A', type: 'cardio', status: 'available' },
-      { id: '2', name: 'Dumbbell Set', type: 'strength', status: 'in_use' },
-      { id: '3', name: 'Yoga Mat', type: 'yoga', status: 'available' },
-      { id: '4', name: 'Meditation Cushion', type: 'meditation', status: 'available' },
-      { id: '5', name: 'Stationary Bike', type: 'cardio', status: 'in_use' },
-      { id: '6', name: 'Barbell', type: 'strength', status: 'available' },
-    ];
-
-    // Simulate loading delay
-    const timer = setTimeout(() => {
-      setEquipment(mockEquipment);
-      setLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    (async () => {
+      try {
+        const items = await listEquipment();
+        if (isMounted) setEquipment(items);
+      } catch (e) {
+        console.error('Failed to load equipment', e);
+        if (isMounted) setError((e as Error).message);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+    return () => { isMounted = false; };
   }, []);
 
   return (
@@ -44,9 +35,13 @@ export default function EquipmentListScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0a7ea4" />
         </View>
+      ) : error ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Error: {error}</Text>
+        </View>
       ) : equipment.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No equipment available</Text>
+          <Text style={styles.emptyText}>No equipment available. Run the Seed screen!</Text>
         </View>
       ) : (
         <ScrollView 

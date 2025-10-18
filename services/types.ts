@@ -29,3 +29,16 @@ export interface Appointment {
   status: AppointmentStatus;
   createdAt: number;
 }
+
+export type EquipmentStatus = 'available' | 'in_use';
+
+export interface Equipment {
+  id: string;
+  name: string;
+  type: string;
+  status: EquipmentStatus;
+  description?: string;
+  location?: string;
+  createdAt: number;
+  updatedAt?: number;
+}
