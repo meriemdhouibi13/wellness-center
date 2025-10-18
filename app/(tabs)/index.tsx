@@ -11,17 +11,13 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface Equipment {
-  id: string;
-  name: string;
-  type: string;
-  status: 'available' | 'in_use';
-}
+import { listEquipment } from '@/services/equipment';
+import type { Equipment } from '@/services/types';
 
 export default function HomeScreen() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [currentDate] = useState(new Date());
@@ -48,20 +44,22 @@ export default function HomeScreen() {
   ];
   
   useEffect(() => {
-    // TODO: Replace with actual Firebase query
-    // For now, using mock data
-    const mockEquipment: Equipment[] = [
-      { id: '1', name: 'Treadmill A', type: 'cardio', status: 'available' },
-      { id: '2', name: 'Dumbbell Set', type: 'strength', status: 'in_use' },
-      { id: '3', name: 'Yoga Mat', type: 'yoga', status: 'available' },
-      { id: '4', name: 'Meditation Cushion', type: 'meditation', status: 'available' },
-      { id: '5', name: 'Stationary Bike', type: 'cardio', status: 'in_use' },
-      { id: '6', name: 'Barbell', type: 'strength', status: 'available' },
-    ];
+    loadEquipmentData();
+    
+    // Auto-refresh every 5 seconds to show real-time updates
+    const interval = setInterval(() => {
+      loadEquipmentData();
+    }, 5000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, []);
 
-    // Simulate loading delay
-    const timer = setTimeout(() => {
-      setEquipment(mockEquipment);
+  async function loadEquipmentData() {
+    try {
+      // Fetch equipment from Firebase (no loading state changes during auto-refresh)
+      const equipmentData = await listEquipment();
+      setEquipment(equipmentData);
       
       // Calculate equipment availability by type
       const status = {
@@ -71,7 +69,7 @@ export default function HomeScreen() {
         meditation: { available: 0, total: 0 },
       };
       
-      mockEquipment.forEach(item => {
+      equipmentData.forEach(item => {
         const type = item.type as keyof typeof status;
         if (status[type]) {
           status[type].total += 1;
@@ -88,11 +86,19 @@ export default function HomeScreen() {
         meditation: status.meditation || { available: 0, total: 0 },
       });
       
-      setLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
+      // Only change loading state on initial load
+      if (isInitialLoad) {
+        setLoading(false);
+        setIsInitialLoad(false);
+      }
+    } catch (error) {
+      console.error('Error loading equipment:', error);
+      if (isInitialLoad) {
+        setLoading(false);
+        setIsInitialLoad(false);
+      }
+    }
+  }
 
   // Handle quick action button presses
   const handleQuickAction = (action: string) => {

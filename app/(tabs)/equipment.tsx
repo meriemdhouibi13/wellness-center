@@ -8,10 +8,12 @@ export default function EquipmentTab() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    
+    const fetchEquipment = async () => {
       try {
         console.log('Fetching equipment...');
         const items = await listEquipment();
@@ -21,10 +23,24 @@ export default function EquipmentTab() {
         console.error('Failed to load equipment', e);
         if (isMounted) setError((e as Error).message);
       } finally {
-        if (isMounted) setLoading(false);
+        // Only change loading state on initial load
+        if (isMounted && isInitialLoad) {
+          setLoading(false);
+          setIsInitialLoad(false);
+        }
       }
-    })();
-    return () => { isMounted = false; };
+    };
+    
+    // Initial fetch
+    fetchEquipment();
+    
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(fetchEquipment, 5000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
