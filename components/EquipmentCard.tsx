@@ -32,10 +32,8 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   
   // Handle card press
   const handlePress = () => {
-    if (status === 'available') {
-      // Navigate to equipment listing page
-      router.push('/equipment/index');
-    }
+    // Navigate to equipment detail page
+    router.push(`/equipment/${id}`);
   };
 
   return (
@@ -45,8 +43,7 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
         status === 'available' ? styles.availableCard : styles.inUseCard
       ]}
       onPress={handlePress}
-      disabled={status !== 'available'}
-      activeOpacity={status === 'available' ? 0.7 : 1}
+      activeOpacity={0.7}
     >
       <Text style={styles.typeLabel}>{type.toUpperCase()}</Text>
       <Text style={styles.name}>{name}</Text>
@@ -61,9 +58,7 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
       </Text>
       
       <Text style={styles.actionText}>
-        {status === 'available' 
-          ? 'Tap to start session' 
-          : 'Available soon'}
+        Tap for details
       </Text>
     </TouchableOpacity>
   );

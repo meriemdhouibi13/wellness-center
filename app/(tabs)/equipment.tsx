@@ -1,5 +1,5 @@
-import { Redirect } from 'expo-router';
+import EquipmentListScreen from '@/app/equipment/index';
 
-export default function EquipmentTabRedirect() {
-  return <Redirect href="/equipment/index" />;
+export default function EquipmentTab() {
+  return <EquipmentListScreen />;
 }
