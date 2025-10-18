@@ -11,7 +11,8 @@ export default function EquipmentTab() {
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    
+    const fetchEquipment = async () => {
       try {
         console.log('Fetching equipment...');
         const items = await listEquipment();
@@ -23,8 +24,18 @@ export default function EquipmentTab() {
       } finally {
         if (isMounted) setLoading(false);
       }
-    })();
-    return () => { isMounted = false; };
+    };
+    
+    // Initial fetch
+    fetchEquipment();
+    
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(fetchEquipment, 5000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (

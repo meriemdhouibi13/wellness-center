@@ -44,11 +44,22 @@ export default function HomeScreen() {
   
   useEffect(() => {
     loadEquipmentData();
+    
+    // Auto-refresh every 5 seconds to show real-time updates
+    const interval = setInterval(() => {
+      loadEquipmentData();
+    }, 5000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   async function loadEquipmentData() {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load, not on auto-refresh
+      if (equipment.length === 0) {
+        setLoading(true);
+      }
       
       // Fetch equipment from Firebase
       const equipmentData = await listEquipment();
