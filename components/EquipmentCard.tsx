@@ -33,8 +33,8 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   // Handle card press
   const handlePress = () => {
     if (status === 'available') {
-      // Navigate to equipment listing page
-      router.push('/equipment/index');
+  // Navigate to equipment listing page
+  router.push('/equipment/index' as any);
     }
   };
 
