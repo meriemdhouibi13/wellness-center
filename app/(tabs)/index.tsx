@@ -17,6 +17,7 @@ import type { Equipment } from '@/services/types';
 export default function HomeScreen() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [currentDate] = useState(new Date());
@@ -56,12 +57,7 @@ export default function HomeScreen() {
 
   async function loadEquipmentData() {
     try {
-      // Only show loading spinner on initial load, not on auto-refresh
-      if (equipment.length === 0) {
-        setLoading(true);
-      }
-      
-      // Fetch equipment from Firebase
+      // Fetch equipment from Firebase (no loading state changes during auto-refresh)
       const equipmentData = await listEquipment();
       setEquipment(equipmentData);
       
@@ -90,10 +86,17 @@ export default function HomeScreen() {
         meditation: status.meditation || { available: 0, total: 0 },
       });
       
-      setLoading(false);
+      // Only change loading state on initial load
+      if (isInitialLoad) {
+        setLoading(false);
+        setIsInitialLoad(false);
+      }
     } catch (error) {
       console.error('Error loading equipment:', error);
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+        setIsInitialLoad(false);
+      }
     }
   }
 
