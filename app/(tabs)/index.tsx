@@ -24,7 +24,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [currentDate] = useState(new Date());
+  const [currentDate] = useState(new Date('2025-10-18T15:50:11Z')); // Using the provided date
+  const username = 'meriemdhouibi13'; // Including the user's login
   
   // Format date as "Saturday, Oct 18"
   const formattedDate = currentDate.toLocaleDateString('en-US', {
@@ -98,18 +99,27 @@ export default function HomeScreen() {
   const handleQuickAction = (action: string) => {
     switch (action) {
       case 'scan':
-        // Navigate to QR scanner when implemented
-        router.push('/equipment');
+        // Navigate to QR scanner
+        router.push('/scan' as any);
         break;
       case 'find':
-        router.push('/equipment');
+        router.push('/equipment' as any);
         break;
       case 'stats':
-        router.push('/(tabs)/explore');
+        router.push('/(tabs)/explore' as any);
         break;
       default:
         break;
     }
+  };
+
+  // Get first name from username for personalized greeting
+  const getFirstName = () => {
+    // Check if username has numeric suffix and remove it
+    const nameWithoutNumbers = username.replace(/\d+$/, '');
+    
+    // Capitalize the first letter
+    return nameWithoutNumbers.charAt(0).toUpperCase() + nameWithoutNumbers.slice(1);
   };
 
   return (
@@ -118,11 +128,15 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.userContainer}>
           <View style={styles.userAvatar}>
-            <Text style={styles.avatarText}>👤</Text>
+            <Text style={styles.avatarText}>
+              {getFirstName().charAt(0)}
+            </Text>
           </View>
         </View>
         <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>Wellness Center</Text>
+          <Text style={styles.headerTitle}>
+            Hi, {getFirstName()}
+          </Text>
           <Text style={styles.dateText}>{formattedDate}</Text>
         </View>
         <TouchableOpacity style={styles.infoButton}>
@@ -180,7 +194,7 @@ export default function HomeScreen() {
             <Text style={styles.noActivityText}>No active sessions</Text>
             <TouchableOpacity 
               style={styles.startSessionButton}
-              onPress={() => handleQuickAction('scan')}
+              onPress={() => router.push('/scan' as any)}
             >
               <Text style={styles.startSessionText}>➕ Start a session by scanning a QR</Text>
             </TouchableOpacity>
@@ -189,7 +203,7 @@ export default function HomeScreen() {
           {/* Center Status */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Center Status</Text>
-            <TouchableOpacity onPress={() => router.push('/equipment')}>
+            <TouchableOpacity onPress={() => router.push('/equipment' as any)}>
               <Text style={styles.moreLink}>📊 More</Text>
             </TouchableOpacity>
           </View>
@@ -227,7 +241,7 @@ export default function HomeScreen() {
               <TouchableOpacity 
                 key={item.id}
                 style={styles.recommendationCard}
-                onPress={() => router.push(`/equipment/${item.id}`)}
+                onPress={() => router.push(`/equipment/${item.id}` as any)}
               >
                 <Text style={styles.recommendationTitle}>{item.name}</Text>
                 <Text style={styles.recommendationReason}>{item.reason}</Text>
@@ -235,7 +249,7 @@ export default function HomeScreen() {
             ))}
           </View>
           
-          {/* Equipment List (from your original code) */}
+          {/* Equipment List */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>All Equipment</Text>
           </View>
@@ -274,14 +288,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f1f1',
+    backgroundColor: '#0a7ea4',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#0a7ea4',
   },
   avatarText: {
     fontSize: 22,
+    color: 'white',
+    fontWeight: 'bold',
   },
   headerTextContainer: {
     flex: 1,

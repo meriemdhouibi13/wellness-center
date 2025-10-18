@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "WellnessCenterApp",
+    "name": "Wellness Center",
     "slug": "WellnessCenterApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan QR codes for equipment tracking.",
+        "CFBundleDisplayName": "Wellness Center"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +23,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["CAMERA"],
+      "package": "com.wellnesscenter.app"
     },
     "web": {
       "output": "static",
@@ -38,6 +44,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow Wellness Center to access your camera to scan equipment QR codes."
+        }
       ]
     ],
     "extra": {
@@ -47,11 +59,23 @@
       "firebaseStorageBucket": "wellness-center-hackathon.firebasestorage.app",
       "firebaseMessagingSenderId": "82202466445",
       "firebaseAppId": "1:82202466445:web:852d8363ef1f364957eac4",
-      "firebaseMeasurementId": "G-8K08F9TY1P"
+      "firebaseMeasurementId": "G-8K08F9TY1P",
+      "currentDate": "2025-10-18 15:54:09",
+      "currentUser": "meriemdhouibi13",
+      "eas": {
+        "projectId": "wellness-center-hackathon"
+      }
     },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/wellness-center-hackathon",
+      "enabled": true
     }
   }
 }

@@ -16,13 +16,26 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase only once
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+let app: any = null;
+let db: any = null;
+let auth: any = null;
 
-// Initialize Firestore with long polling for React Native/Expo compatibility
-const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
-
-const auth = getAuth(app);
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    
+    // Initialize Firestore with long polling for React Native/Expo compatibility
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
+    
+    auth = getAuth(app);
+  } else {
+    console.warn('Firebase config not found, running without Firebase');
+  }
+} catch (error) {
+  console.error('Firebase initialization failed:', error);
+  // Continue without Firebase
+}
 
 export { db, auth };
