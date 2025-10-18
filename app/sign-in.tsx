@@ -5,9 +5,9 @@ import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, Touchable
 
 export default function SignInScreen() {
   const { signIn, signUp, user, loading } = useAuth();
-  const [email, setEmail] = useState('demo@example.com');
-  const [password, setPassword] = useState('password123');
-  const [name, setName] = useState('Demo User');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

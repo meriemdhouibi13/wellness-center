@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { listEquipment } from '@/services/equipment';
 import type { Equipment } from '@/services/types';
+import { getOpenSession, startSession, endSession } from '@/services/sessions';
 
 export default function HomeScreen() {
   const { user, profile, loading: authLoading, signOut } = useAuth();
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [currentDate] = useState(new Date());
+  const [openSession, setOpenSession] = useState<{ startTime: number } | null>(null);
   
   // Format date as "Saturday, Oct 18"
   const formattedDate = currentDate.toLocaleDateString('en-US', {
@@ -47,6 +49,9 @@ export default function HomeScreen() {
   
   useEffect(() => {
     loadEquipmentData();
+    if (user?.uid) {
+      getOpenSession(user.uid).then((s) => setOpenSession(s ? { startTime: s.startTime } : null)).catch(() => setOpenSession(null));
+    }
     
     // Auto-refresh every 5 seconds to show real-time updates
     const interval = setInterval(() => {
@@ -55,7 +60,7 @@ export default function HomeScreen() {
     
     // Cleanup interval on unmount
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.uid]);
 
   async function loadEquipmentData() {
     try {
@@ -101,6 +106,22 @@ export default function HomeScreen() {
       }
     }
   }
+
+  const onStartSession = async () => {
+    if (!user?.uid) return;
+    try {
+      const s = await startSession(user.uid);
+      setOpenSession({ startTime: s.startTime });
+    } catch (e) { console.warn(e); }
+  };
+
+  const onEndSession = async () => {
+    if (!user?.uid) return;
+    try {
+      await endSession(user.uid);
+      setOpenSession(null);
+    } catch (e) { console.warn(e); }
+  };
 
   // Handle quick action button presses
   const handleQuickAction = (action: string) => {
@@ -191,13 +212,21 @@ export default function HomeScreen() {
           </View>
           
           <View style={styles.activityCard}>
-            <Text style={styles.noActivityText}>No active sessions</Text>
-            <TouchableOpacity 
-              style={styles.startSessionButton}
-              onPress={() => handleQuickAction('scan')}
-            >
-              <Text style={styles.startSessionText}>➕ Start a session by scanning a QR</Text>
-            </TouchableOpacity>
+            {openSession ? (
+              <>
+                <Text style={styles.noActivityText}>Session started: {new Date(openSession.startTime).toLocaleTimeString()}</Text>
+                <TouchableOpacity style={styles.startSessionButton} onPress={onEndSession}>
+                  <Text style={styles.startSessionText}>⏹️ End Session</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.noActivityText}>No active sessions</Text>
+                <TouchableOpacity style={styles.startSessionButton} onPress={onStartSession}>
+                  <Text style={styles.startSessionText}>➕ Start Session</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
           
           {/* Center Status */}

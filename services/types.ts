@@ -43,3 +43,11 @@ export interface Equipment {
   createdAt: number;
   updatedAt?: number;
 }
+
+export interface UserSession {
+  id: string;
+  startTime: number; // ms since epoch
+  endTime: number | null; // null when active
+  durationMinutes?: number; // set on end
+  createdAt: number;
+}

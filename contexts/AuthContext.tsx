@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { User } from 'firebase/auth';
+type UserLike = { uid: string; email?: string | null; displayName?: string | null };
 import type { UserProfile, UserRole } from '@/services/types';
 import { emailPasswordSignIn, emailPasswordSignUp, signOutUser, subscribeAuth } from '@/services/auth';
 
 interface AuthContextValue {
-  user: User | null;
+  user: UserLike | null;
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -16,13 +16,13 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [userLike, setUserLike] = useState<UserLike | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = subscribeAuth((s) => {
-      setUser(s.user);
+      setUserLike(s.user);
       setProfile(s.profile);
       setLoading(s.loading);
     });
@@ -31,21 +31,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user,
+      user: userLike,
       profile,
       loading,
       async signIn(email, password) {
         const { user: u, profile: p } = await emailPasswordSignIn(email, password);
-        setUser(u); setProfile(p); setLoading(false);
+        setUserLike(u); setProfile(p); setLoading(false);
       },
       async signUp(email, password, name, role) {
         const { user: u, profile: p } = await emailPasswordSignUp(email, password, name, role);
-        setUser(u); setProfile(p); setLoading(false);
+        setUserLike(u); setProfile(p); setLoading(false);
       },
-      async signOut() { await signOutUser(); setUser(null); setProfile(null); },
+      async signOut() { await signOutUser(); setUserLike(null); setProfile(null); },
       hasRole(...roles) { return !!profile && roles.includes(profile.role); },
     }),
-    [user, profile, loading]
+    [userLike, profile, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

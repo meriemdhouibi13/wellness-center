@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
@@ -23,6 +23,11 @@ const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
 
-const auth = getAuth(app);
+// Lazy getter for Auth to avoid importing firebase/auth on native at startup
+export async function getAuthClient() {
+  if (Platform.OS !== 'web') return null;
+  const { getAuth } = await import('firebase/auth');
+  return getAuth(app);
+}
 
-export { db, auth };
+export { db };
