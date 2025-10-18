@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
-import { Platform } from 'react-native';
+import { getAuth } from 'firebase/auth';
 import Constants from 'expo-constants';
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
@@ -16,18 +16,26 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase only once
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+let app: any = null;
+let db: any = null;
+let auth: any = null;
 
-// Initialize Firestore with long polling for React Native/Expo compatibility
-const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
-
-// Lazy getter for Auth to avoid importing firebase/auth on native at startup
-export async function getAuthClient() {
-  if (Platform.OS !== 'web') return null;
-  const { getAuth } = await import('firebase/auth');
-  return getAuth(app);
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    
+    // Initialize Firestore with long polling for React Native/Expo compatibility
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
+    
+    auth = getAuth(app);
+  } else {
+    console.warn('Firebase config not found, running without Firebase');
+  }
+} catch (error) {
+  console.error('Firebase initialization failed:', error);
+  // Continue without Firebase
 }
 
-export { db };
+export { db, auth };
