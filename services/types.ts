@@ -31,7 +31,7 @@ export interface Appointment {
   createdAt: number;
 }
 
-export type EquipmentStatus = 'available' | 'in_use';
+export type EquipmentStatus = 'available' | 'in_use' | 'broken';
 
 export interface Equipment {
   id: string;
@@ -40,6 +40,7 @@ export interface Equipment {
   status: EquipmentStatus;
   description?: string;
   location?: string;
+  hasMalfunction?: boolean;
   createdAt: number;
   updatedAt?: number;
 }

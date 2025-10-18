@@ -110,6 +110,20 @@
       transform: translateY(0);
     }
 
+    .button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .button:disabled:hover {
+      background: #9ca3af;
+      transform: none;
+      box-shadow: none;
+    }
+
     .button.secondary {
       background: #10b981;
     }
@@ -118,12 +132,20 @@
       background: #059669;
     }
 
+    .button.secondary:disabled {
+      background: #9ca3af;
+    }
+
     .button.danger {
       background: #ef4444;
     }
 
     .button.danger:hover {
       background: #dc2626;
+    }
+
+    .button.danger:disabled {
+      background: #9ca3af;
     }
 
     .input-group {
@@ -224,44 +246,43 @@
         <h2><span class="card-icon">🏃</span> Equipment Control</h2>
         <div class="input-group">
           <label>Equipment ID</label>
-          <select id="equipmentSelect">
+          <select id="equipmentSelect" onchange="updateButtonStates()">
             <option value="">Loading equipment...</option>
           </select>
         </div>
-        <button class="button secondary" onclick="startEquipmentSession()">▶️ Start Session</button>
-        <button class="button danger" onclick="endEquipmentSession()">⏹️ End Session</button>
-        <button class="button" onclick="toggleEquipmentStatus()">🔄 Toggle Status</button>
+        <button id="startSessionBtn" class="button secondary" onclick="startEquipmentSession()">▶️ Start Session</button>
+        <button id="endSessionBtn" class="button danger" onclick="endEquipmentSession()">⏹️ End Session</button>
+        <button id="reportMalfunctionBtn" class="button danger" onclick="reportMalfunction()">⚠️ Report Malfunction</button>
+        <button id="fixMalfunctionBtn" class="button" onclick="fixMalfunction()">🔧 Fix Malfunction</button>
+        <button id="markBrokenBtn" class="button danger" onclick="markAsBroken()">❌ Mark as Broken</button>
+        <button id="fixBrokenBtn" class="button" onclick="fixBrokenMachine()">✅ Fix Broken Machine</button>
       </div>
 
-      <!-- User Activity Simulation -->
+      <!-- User Workout Sessions -->
       <div class="card">
-        <h2><span class="card-icon">👤</span> User Activity</h2>
+        <h2><span class="card-icon">📊</span> Workout Sessions</h2>
         <div class="input-group">
-          <label>User ID</label>
-          <input type="text" id="userId" placeholder="user123" value="demo-user">
-        </div>
-        <div class="input-group">
-          <label>Activity Type</label>
-          <select id="activityType">
-            <option value="cardio">Cardio</option>
-            <option value="strength">Strength Training</option>
-            <option value="yoga">Yoga</option>
-            <option value="meditation">Meditation</option>
-          </select>
+          <label>User ID (Firebase Auth UID)</label>
+          <input type="text" id="sessionUserId" placeholder="Firebase UID">
         </div>
         <div class="input-group">
           <label>Duration (minutes)</label>
-          <input type="number" id="activityDuration" placeholder="30" value="30">
+          <input type="number" id="sessionDuration" placeholder="30" value="30">
         </div>
-        <button class="button" onclick="logActivity()">📝 Log Activity</button>
+        <div class="input-group">
+          <label>Equipment ID</label>
+          <input type="text" id="sessionEquipment" placeholder="treadmill_1" value="treadmill_1">
+        </div>
+        <button class="button" onclick="addWorkoutSession()">➕ Add Single Session</button>
+        <button class="button secondary" onclick="addWeekOfSessions()">📅 Add 7 Days of Sessions</button>
+        <button class="button danger" onclick="clearUserSessions()">🗑️ Clear User Sessions</button>
       </div>
 
       <!-- Quick Actions -->
       <div class="card">
         <h2><span class="card-icon">⚡</span> Quick Actions</h2>
         <button class="button" onclick="refreshEquipment()">🔄 Refresh Equipment List</button>
-        <button class="button secondary" onclick="seedMockData()">🌱 Seed Mock Data</button>
-        <button class="button" onclick="simulateBusyPeriod()">🏢 Simulate Busy Period</button>
+        <button class="button" onclick="toggleAllMachinesUsed()">🏢 Toggle All Machines as "Used"</button>
         <button class="button danger" onclick="clearAllSessions()">🧹 Clear All Sessions</button>
       </div>
 
@@ -300,7 +321,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-    import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, query, where, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, deleteDoc, query, where, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
     // Firebase configuration
     const firebaseConfig = {
@@ -319,7 +340,7 @@
 
     // Make available globally
     window.db = db;
-    window.firestoreModule = { collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, query, where, serverTimestamp };
+    window.firestoreModule = { collection, getDocs, doc, getDoc, updateDoc, setDoc, addDoc, deleteDoc, query, where, serverTimestamp };
 
     // Log function
     function log(message, type = 'success') {
@@ -351,7 +372,9 @@
         const snapshot = await getDocs(equipmentRef);
         
         const select = document.getElementById('equipmentSelect');
-        select.innerHTML = '<option value="">Select equipment...</option>';
+        const currentValue = select.value; // Remember current selection
+        
+        select.innerHTML = '<option value="">-- No Equipment Selected --</option>';
         
         snapshot.forEach(doc => {
           const data = doc.data();
@@ -361,6 +384,14 @@
           select.appendChild(option);
         });
         
+        // Restore previous selection if it still exists
+        if (currentValue) {
+          select.value = currentValue;
+        }
+        
+        // Update button states after loading
+        updateButtonStates();
+        
         log(`Loaded ${snapshot.size} equipment items`);
       } catch (error) {
         log(`Error loading equipment: ${error.message}`, 'error');
@@ -368,6 +399,94 @@
     }
 
     window.loadEquipment = loadEquipment;
+
+    // Update button states based on selected equipment status
+    async function updateButtonStates() {
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      
+      // Get button elements
+      const startBtn = document.getElementById('startSessionBtn');
+      const endBtn = document.getElementById('endSessionBtn');
+      const reportMalfunctionBtn = document.getElementById('reportMalfunctionBtn');
+      const fixMalfunctionBtn = document.getElementById('fixMalfunctionBtn');
+      const markBrokenBtn = document.getElementById('markBrokenBtn');
+      const fixBrokenBtn = document.getElementById('fixBrokenBtn');
+      
+      // If no equipment selected, disable all buttons
+      if (!equipmentId) {
+        startBtn.disabled = true;
+        endBtn.disabled = true;
+        reportMalfunctionBtn.disabled = true;
+        fixMalfunctionBtn.disabled = true;
+        markBrokenBtn.disabled = true;
+        fixBrokenBtn.disabled = true;
+        return;
+      }
+      
+      try {
+        const { doc, getDoc } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
+        const equipmentDoc = await getDoc(equipmentRef);
+        
+        if (!equipmentDoc.exists()) {
+          // Equipment not found, disable all buttons
+          startBtn.disabled = true;
+          endBtn.disabled = true;
+          reportMalfunctionBtn.disabled = true;
+          fixMalfunctionBtn.disabled = true;
+          markBrokenBtn.disabled = true;
+          fixBrokenBtn.disabled = true;
+          return;
+        }
+        
+        const data = equipmentDoc.data();
+        const isBroken = data.status === 'broken';
+        const isInUse = data.status === 'in_use';
+        const isAvailable = data.status === 'available';
+        const hasMalfunction = data.hasMalfunction === true;
+        
+        // If broken, only allow "Fix Broken Machine" button
+        if (isBroken) {
+          startBtn.disabled = true;
+          endBtn.disabled = true;
+          reportMalfunctionBtn.disabled = true;
+          fixMalfunctionBtn.disabled = true;
+          markBrokenBtn.disabled = true;
+          fixBrokenBtn.disabled = false;
+        } else {
+          // Not broken - enable buttons based on current state
+          
+          // Start Session: only enabled if available (not in use)
+          startBtn.disabled = !isAvailable;
+          
+          // End Session: only enabled if in use
+          endBtn.disabled = !isInUse;
+          
+          // Report Malfunction: only enabled if no malfunction already reported
+          reportMalfunctionBtn.disabled = hasMalfunction;
+          
+          // Fix Malfunction: only enabled if malfunction is reported
+          fixMalfunctionBtn.disabled = !hasMalfunction;
+          
+          // Mark as Broken: always enabled when not broken
+          markBrokenBtn.disabled = false;
+          
+          // Fix Broken Machine: only enabled when broken
+          fixBrokenBtn.disabled = true;
+        }
+      } catch (error) {
+        console.error('Error updating button states:', error);
+        // On error, enable all buttons to prevent lockout
+        startBtn.disabled = false;
+        endBtn.disabled = false;
+        reportMalfunctionBtn.disabled = false;
+        fixMalfunctionBtn.disabled = false;
+        markBrokenBtn.disabled = false;
+        fixBrokenBtn.disabled = false;
+      }
+    }
+    
+    window.updateButtonStates = updateButtonStates;
 
     // Update statistics
     async function updateStats() {
@@ -413,7 +532,7 @@
         
         await updateDoc(equipmentRef, {
           status: 'in_use',
-          currentUserId: document.getElementById('userId').value,
+          currentUserId: 'demo-user',
           sessionStartTime: serverTimestamp()
         });
         
@@ -452,8 +571,55 @@
       }
     };
 
-    // Toggle equipment status
-    window.toggleEquipmentStatus = async function() {
+    // Report malfunction
+    window.reportMalfunction = async function() {
+      console.log('reportMalfunction called');
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      console.log('Selected equipment:', equipmentId);
+      
+      if (!equipmentId) {
+        log('Please select equipment first', 'error');
+        return;
+      }
+
+      try {
+        const { doc, getDoc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
+        
+        // Check if equipment is broken first
+        const equipmentDoc = await getDoc(equipmentRef);
+        if (!equipmentDoc.exists()) {
+          log('Equipment not found', 'error');
+          return;
+        }
+
+        const data = equipmentDoc.data();
+        console.log('Equipment data:', data);
+        
+        if (data.status === 'broken') {
+          console.log('Equipment is broken, cannot report malfunction');
+          log('Cannot report malfunction on broken equipment. Fix it first.', 'error');
+          return;
+        }
+        
+        console.log('About to update with malfunction flag...');
+        await updateDoc(equipmentRef, { 
+          hasMalfunction: true,
+          malfunctionReportedAt: serverTimestamp()
+        });
+        console.log('Update successful!');
+        
+        log(`⚠️ Reported malfunction for equipment: ${equipmentId}`, 'warning');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        console.error('Full error:', error);
+        log(`❌ Error reporting malfunction: ${error.message}`, 'error');
+      }
+    };
+
+    // Fix malfunction
+    window.fixMalfunction = async function() {
       const equipmentId = document.getElementById('equipmentSelect').value;
       if (!equipmentId) {
         log('Please select equipment first', 'error');
@@ -461,54 +627,89 @@
       }
 
       try {
-        const { doc, getDoc, updateDoc } = window.firestoreModule;
+        const { doc, getDoc, updateDoc, serverTimestamp } = window.firestoreModule;
         const equipmentRef = doc(window.db, 'equipment', equipmentId);
-        const equipmentDoc = await getDoc(equipmentRef);
         
+        // Check if equipment is broken first
+        const equipmentDoc = await getDoc(equipmentRef);
         if (!equipmentDoc.exists()) {
           log('Equipment not found', 'error');
           return;
         }
+
+        const data = equipmentDoc.data();
+        if (data.status === 'broken') {
+          log('Cannot fix malfunction on broken equipment. Use "Fix Broken Machine" instead.', 'error');
+          return;
+        }
         
-        const currentStatus = equipmentDoc.data().status;
-        const newStatus = currentStatus === 'available' ? 'in_use' : 'available';
+        await updateDoc(equipmentRef, { 
+          hasMalfunction: false,
+          malfunctionReportedAt: null,
+          malfunctionFixedAt: serverTimestamp()
+        });
         
-        await updateDoc(equipmentRef, { status: newStatus });
-        
-        log(`✅ Toggled equipment status to: ${newStatus}`, 'success');
+        log(`🔧 Fixed malfunction for equipment: ${equipmentId}`, 'success');
         await loadEquipment();
         await updateStats();
       } catch (error) {
-        log(`❌ Error toggling status: ${error.message}`, 'error');
+        console.error('Full error:', error);
+        log(`❌ Error fixing malfunction: ${error.message}`, 'error');
       }
     };
 
-    // Log user activity
-    window.logActivity = async function() {
-      const userId = document.getElementById('userId').value;
-      const activityType = document.getElementById('activityType').value;
-      const duration = parseInt(document.getElementById('activityDuration').value);
-
-      if (!userId || !duration) {
-        log('Please fill in all fields', 'error');
+    // Mark as broken
+    window.markAsBroken = async function() {
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      if (!equipmentId) {
+        log('Please select equipment first', 'error');
         return;
       }
 
       try {
-        const { collection, addDoc, serverTimestamp } = window.firestoreModule;
-        const activitiesRef = collection(window.db, 'activities');
+        const { doc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
         
-        await addDoc(activitiesRef, {
-          userId,
-          type: activityType,
-          duration,
-          timestamp: serverTimestamp(),
-          completed: true
+        await updateDoc(equipmentRef, { 
+          status: 'broken',
+          currentUserId: null,
+          sessionStartTime: null,
+          brokenAt: serverTimestamp()
         });
         
-        log(`✅ Logged ${activityType} activity for ${userId} (${duration} mins)`, 'success');
+        log(`❌ Marked equipment as broken: ${equipmentId}`, 'error');
+        await loadEquipment();
+        await updateStats();
       } catch (error) {
-        log(`❌ Error logging activity: ${error.message}`, 'error');
+        log(`❌ Error marking as broken: ${error.message}`, 'error');
+      }
+    };
+
+    // Fix broken machine
+    window.fixBrokenMachine = async function() {
+      const equipmentId = document.getElementById('equipmentSelect').value;
+      if (!equipmentId) {
+        log('Please select equipment first', 'error');
+        return;
+      }
+
+      try {
+        const { doc, updateDoc, serverTimestamp } = window.firestoreModule;
+        const equipmentRef = doc(window.db, 'equipment', equipmentId);
+        
+        await updateDoc(equipmentRef, { 
+          status: 'available',
+          brokenAt: null,
+          fixedAt: serverTimestamp(),
+          hasMalfunction: false,
+          malfunctionReportedAt: null
+        });
+        
+        log(`✅ Fixed broken equipment: ${equipmentId} - fully restored to available`, 'success');
+        await loadEquipment();
+        await updateStats();
+      } catch (error) {
+        log(`❌ Error fixing broken equipment: ${error.message}`, 'error');
       }
     };
 
@@ -519,75 +720,35 @@
       await updateStats();
     };
 
-    // Seed mock data
-    window.seedMockData = async function() {
-      log('Seeding mock data...', 'info');
-      
-      const mockEquipment = [
-        { id: 'treadmill-1', name: 'Treadmill A', type: 'cardio', status: 'available' },
-        { id: 'treadmill-2', name: 'Treadmill B', type: 'cardio', status: 'available' },
-        { id: 'bike-1', name: 'Stationary Bike 1', type: 'cardio', status: 'available' },
-        { id: 'weights-1', name: 'Dumbbell Set 1', type: 'strength', status: 'available' },
-        { id: 'weights-2', name: 'Barbell Station', type: 'strength', status: 'available' },
-        { id: 'yoga-1', name: 'Yoga Mat 1', type: 'yoga', status: 'available' },
-        { id: 'meditation-1', name: 'Meditation Room A', type: 'meditation', status: 'available' }
-      ];
-
-      try {
-        const { doc, setDoc, serverTimestamp } = window.firestoreModule;
-        
-        for (const equipment of mockEquipment) {
-          const equipmentRef = doc(window.db, 'equipment', equipment.id);
-          await setDoc(equipmentRef, {
-            ...equipment,
-            createdAt: serverTimestamp(),
-            lastUsedAt: null,
-            currentUserId: null
-          });
-        }
-        
-        log(`✅ Seeded ${mockEquipment.length} equipment items`, 'success');
-        await loadEquipment();
-        await updateStats();
-      } catch (error) {
-        log(`❌ Error seeding data: ${error.message}`, 'error');
-      }
-    };
-
-    // Simulate busy period
-    window.simulateBusyPeriod = async function() {
-      log('Simulating busy period...', 'info');
+    // Toggle all machines as used
+    window.toggleAllMachinesUsed = async function() {
+      log('Setting all machines to "in_use"...', 'info');
       
       try {
         const { collection, getDocs, doc, updateDoc, serverTimestamp } = window.firestoreModule;
         const equipmentRef = collection(window.db, 'equipment');
         const snapshot = await getDocs(equipmentRef);
         
-        let count = 0;
         const promises = [];
         
         snapshot.forEach(docSnapshot => {
-          // Make 60% of equipment busy
-          if (Math.random() < 0.6) {
-            const equipRef = doc(window.db, 'equipment', docSnapshot.id);
-            promises.push(
-              updateDoc(equipRef, {
-                status: 'in_use',
-                currentUserId: `user-${Math.floor(Math.random() * 100)}`,
-                sessionStartTime: serverTimestamp()
-              })
-            );
-            count++;
-          }
+          const equipRef = doc(window.db, 'equipment', docSnapshot.id);
+          promises.push(
+            updateDoc(equipRef, {
+              status: 'in_use',
+              currentUserId: 'demo-user',
+              sessionStartTime: serverTimestamp()
+            })
+          );
         });
         
         await Promise.all(promises);
         
-        log(`✅ Set ${count} equipment items to busy`, 'success');
+        log(`✅ Set ${snapshot.size} machines to "in_use"`, 'success');
         await loadEquipment();
         await updateStats();
       } catch (error) {
-        log(`❌ Error simulating busy period: ${error.message}`, 'error');
+        log(`❌ Error setting machines: ${error.message}`, 'error');
       }
     };
 
@@ -621,6 +782,130 @@
         await updateStats();
       } catch (error) {
         log(`❌ Error clearing sessions: ${error.message}`, 'error');
+      }
+    };
+
+    // ========== WORKOUT SESSIONS MANAGEMENT ==========
+
+    // Add a single workout session
+    window.addWorkoutSession = async function() {
+      const userId = document.getElementById('sessionUserId').value;
+      const duration = parseInt(document.getElementById('sessionDuration').value);
+      const equipmentId = document.getElementById('sessionEquipment').value;
+
+      if (!userId) {
+        log('Please enter a User ID (Firebase UID)', 'error');
+        return;
+      }
+
+      if (!duration || duration <= 0) {
+        log('Please enter a valid duration', 'error');
+        return;
+      }
+
+      try {
+        const { collection, doc, addDoc } = window.firestoreModule;
+        // Sessions are stored as subcollection: users/{uid}/sessions
+        const userDocRef = doc(window.db, 'users', userId);
+        const sessionsRef = collection(userDocRef, 'sessions');
+        
+        const now = Date.now();
+        const endTime = now + (duration * 60 * 1000);
+        const sessionData = {
+          startTime: now,
+          endTime: endTime,
+          equipmentId: equipmentId || 'manual_entry',
+          durationMinutes: duration,
+          createdAt: now
+        };
+
+        await addDoc(sessionsRef, sessionData);
+        
+        log(`✅ Added ${duration}-minute workout session for user ${userId}`, 'success');
+      } catch (error) {
+        log(`❌ Error adding session: ${error.message}`, 'error');
+      }
+    };
+
+    // Add a week of workout sessions
+    window.addWeekOfSessions = async function() {
+      const userId = document.getElementById('sessionUserId').value;
+
+      if (!userId) {
+        log('Please enter a User ID (Firebase UID)', 'error');
+        return;
+      }
+
+      try {
+        const { collection, doc, addDoc } = window.firestoreModule;
+        // Sessions are stored as subcollection: users/{uid}/sessions
+        const userDocRef = doc(window.db, 'users', userId);
+        const sessionsRef = collection(userDocRef, 'sessions');
+        
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
+        const duration = 30; // 30 minutes per session = 210 minutes total
+        const equipment = ['treadmill_1', 'bike_1', 'weights_1', 'treadmill_2', 'bike_2', 'weights_2', 'yoga_1'];
+
+        log('Adding 7 days of sessions (30 min each)...', 'info');
+
+        for (let i = 0; i < 7; i++) {
+          const sessionTime = now - (i * dayMs);
+          
+          const sessionData = {
+            startTime: sessionTime,
+            endTime: sessionTime + (duration * 60 * 1000),
+            equipmentId: equipment[i],
+            durationMinutes: duration,
+            createdAt: sessionTime
+          };
+
+          await addDoc(sessionsRef, sessionData);
+        }
+        
+        log(`✅ Added 7 workout sessions for user ${userId} (one per day)`, 'success');
+      } catch (error) {
+        log(`❌ Error adding sessions: ${error.message}`, 'error');
+      }
+    };
+
+    // Clear all sessions for a user
+    window.clearUserSessions = async function() {
+      const userId = document.getElementById('sessionUserId').value;
+
+      if (!userId) {
+        log('Please enter a User ID (Firebase UID)', 'error');
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to delete ALL workout sessions for user ${userId}?`)) {
+        return;
+      }
+
+      try {
+        const { collection, doc, getDocs, deleteDoc } = window.firestoreModule;
+        // Sessions are stored as subcollection: users/{uid}/sessions
+        const userDocRef = doc(window.db, 'users', userId);
+        const sessionsRef = collection(userDocRef, 'sessions');
+        
+        const snapshot = await getDocs(sessionsRef);
+        
+        if (snapshot.empty) {
+          log(`No sessions found for user ${userId}`, 'info');
+          return;
+        }
+
+        const promises = [];
+        snapshot.forEach(docSnapshot => {
+          const sessionRef = doc(userDocRef, 'sessions', docSnapshot.id);
+          promises.push(deleteDoc(sessionRef));
+        });
+
+        await Promise.all(promises);
+        
+        log(`✅ Deleted ${snapshot.size} sessions for user ${userId}`, 'success');
+      } catch (error) {
+        log(`❌ Error clearing user sessions: ${error.message}`, 'error');
       }
     };
   </script>

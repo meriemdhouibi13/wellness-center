@@ -296,6 +296,7 @@ export default function HomeScreen() {
               name={item.name}
               type={item.type}
               status={item.status}
+              hasMalfunction={item.hasMalfunction}
             />
           ))}
         </ScrollView>

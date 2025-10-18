@@ -72,6 +72,7 @@ export default function EquipmentTab() {
               name={item.name}
               type={item.type}
               status={item.status}
+              hasMalfunction={item.hasMalfunction}
             />
           ))}
         </ScrollView>
