@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Appointment } from './types';
 
@@ -20,21 +20,19 @@ export async function getAppointment(id: string): Promise<Appointment | null> {
 }
 
 export async function listAppointmentsForPatient(patientId: string): Promise<Appointment[]> {
-  const q = query(
-    collection(db, APPOINTMENTS),
-    where('patientId', '==', patientId),
-    orderBy('startTime', 'asc')
-  );
+  // Using only where to avoid requiring a composite index; sort on client
+  const q = query(collection(db, APPOINTMENTS), where('patientId', '==', patientId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as Appointment);
+  return snap.docs
+    .map((d) => d.data() as Appointment)
+    .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
 }
 
 export async function listAppointmentsForProvider(providerId: string): Promise<Appointment[]> {
-  const q = query(
-    collection(db, APPOINTMENTS),
-    where('providerId', '==', providerId),
-    orderBy('startTime', 'asc')
-  );
+  // Using only where to avoid requiring a composite index; sort on client
+  const q = query(collection(db, APPOINTMENTS), where('providerId', '==', providerId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as Appointment);
+  return snap.docs
+    .map((d) => d.data() as Appointment)
+    .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
 }

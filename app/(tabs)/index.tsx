@@ -1,13 +1,38 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, Button } from 'react-native';
+import React from 'react';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
+import { listProviders } from '@/services/providers';
+import { listAppointmentsForPatient } from '@/services/appointments';
 
 export default function HomeScreen() {
+  const [loading, setLoading] = React.useState(false);
+  const [providerCount, setProviderCount] = React.useState<number | null>(null);
+  const [apptCount, setApptCount] = React.useState<number | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleLoadDemoData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const providers = await listProviders();
+      setProviderCount(providers.length);
+      // Use one of the seeded users from seed.tsx
+      const appts = await listAppointmentsForPatient('u_alex');
+      setApptCount(appts.length);
+    } catch (e) {
+      const msg = (e as Error).message ?? String(e);
+      console.error('Load demo data error:', msg);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -73,6 +98,21 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
+      </ThemedView>
+
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Demo Data (Firestore)</ThemedText>
+        <ThemedText>
+          After tapping the Seed tab, press the button below to fetch counts from Firestore.
+        </ThemedText>
+        <Button title={loading ? 'Loading…' : 'Load from Firestore'} onPress={handleLoadDemoData} disabled={loading} />
+        {error ? <ThemedText style={{ color: 'red' }}>Error: {error}</ThemedText> : null}
+        {providerCount !== null || apptCount !== null ? (
+          <>
+            <ThemedText>Providers found: {providerCount ?? 0}</ThemedText>
+            <ThemedText>Appointments for u_alex: {apptCount ?? 0}</ThemedText>
+          </>
+        ) : null}
       </ThemedView>
     </ParallaxScrollView>
   );
