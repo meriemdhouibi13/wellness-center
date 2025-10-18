@@ -1,136 +1,211 @@
+// Modify app/equipment/[id].tsx to handle starting sessions
+
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Equipment } from '@/services/types';
-import { getEquipment } from '@/services/equipment';
+
+// Mock equipment data
+const mockEquipmentData = {
+  '1': { id: '1', name: 'Treadmill A', type: 'cardio', status: 'available' },
+  '2': { id: '2', name: 'Dumbbell Set', type: 'strength', status: 'in_use' },
+  '3': { id: '3', name: 'Yoga Mat', type: 'yoga', status: 'available' },
+  '4': { id: '4', name: 'Meditation Cushion', type: 'meditation', status: 'available' },
+  '5': { id: '5', name: 'Stationary Bike', type: 'cardio', status: 'in_use' },
+  '6': { id: '6', name: 'Barbell', type: 'strength', status: 'available' },
+};
+
+// Get icon based on equipment type
+const getEquipmentIcon = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'cardio': return '🏃‍♀️';
+    case 'strength': return '🏋️';
+    case 'yoga': return '🧘';
+    case 'meditation': return '🧠';
+    default: return '⚙️';
+  }
+};
 
 export default function EquipmentDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [equipment, setEquipment] = useState<Equipment | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { id } = useLocalSearchParams();
+  const equipmentId = Array.isArray(id) ? id[0] : id || '';
   const router = useRouter();
   const insets = useSafeAreaInsets();
-
+  
+  const [equipment, setEquipment] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<{ active: boolean, startTime?: Date }>({ active: false });
+  const [sessionTimer, setSessionTimer] = useState(0);
+  
+  // Load equipment data
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      if (!id) {
-        if (isMounted) setLoading(false);
-        return;
+    // Simulate API call
+    setTimeout(() => {
+      const data = mockEquipmentData[equipmentId as keyof typeof mockEquipmentData];
+      if (data) {
+        setEquipment(data);
       }
-      try {
-        const item = await getEquipment(id as string);
-        if (isMounted) setEquipment(item);
-      } catch (e) {
-        console.error('Failed to load equipment', e);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-    return () => { isMounted = false; };
-  }, [id]);
-
-  const getEquipmentIcon = () => {
-    switch (equipment?.type.toLowerCase()) {
-      case 'cardio': return '🏃‍♀️';
-      case 'strength': return '🏋️';
-      case 'yoga': return '🧘';
-      case 'meditation': return '🧠';
-      default: return '⚙️';
+      setLoading(false);
+    }, 500);
+  }, [equipmentId]);
+  
+  // Handle timer for active session
+  useEffect(() => {
+    let interval: number | undefined;
+    
+    if (session.active && session.startTime) {
+      interval = setInterval(() => {
+        const seconds = Math.floor((new Date().getTime() - session.startTime!.getTime()) / 1000);
+        setSessionTimer(seconds);
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [session]);
+  
+  // Start a session with this equipment
+  const startSession = () => {
+    // In a real app, you would make an API call here
+    setSession({ 
+      active: true, 
+      startTime: new Date() 
+    });
+    
+    // Update equipment status locally
+    if (equipment) {
+      setEquipment({
+        ...equipment,
+        status: 'in_use'
+      });
     }
   };
-
+  
+  // End the current session
+  const endSession = () => {
+    // In a real app, you would make an API call here
+    setSession({ active: false });
+    
+    // Update equipment status locally
+    if (equipment) {
+      setEquipment({
+        ...equipment,
+        status: 'available'
+      });
+    }
+  };
+  
+  // Format timer as MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0a7ea4" />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#11181C" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Equipment Details</Text>
+          <View style={styles.headerRight} />
         </View>
+        <ActivityIndicator style={styles.loading} size="large" color="#0a7ea4" />
       </View>
     );
   }
-
+  
   if (!equipment) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Equipment not found</Text>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#11181C" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Equipment Details</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.notFoundContainer}>
+          <Text style={styles.notFoundText}>Equipment not found</Text>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.buttonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
   }
-
+  
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.icon}>{getEquipmentIcon()}</Text>
-          <Text style={styles.name}>{equipment.name}</Text>
-          <Text style={styles.type}>{equipment.type.toUpperCase()}</Text>
-        </View>
-
-        <View style={[
-          styles.statusBadge,
-          equipment.status === 'available' ? styles.availableBadge : styles.inUseBadge
-        ]}>
-          <Text style={[
-            styles.statusText,
-            equipment.status === 'available' ? styles.availableText : styles.inUseText
-          ]}>
-            {equipment.status === 'available' ? '✓ AVAILABLE' : '⏱ IN USE'}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#11181C" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{equipment.name}</Text>
+        <View style={styles.headerRight} />
+      </View>
+      
+      <View style={styles.content}>
+        <View style={styles.equipmentDetails}>
+          <Text style={styles.equipmentIcon}>
+            {getEquipmentIcon(equipment.type)}
           </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Details</Text>
+          <Text style={styles.equipmentType}>{equipment.type.toUpperCase()}</Text>
           
-          {equipment.description && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Description</Text>
-              <Text style={styles.detailValue}>{equipment.description}</Text>
+          {session.active ? (
+            <View style={styles.sessionContainer}>
+              <Text style={styles.sessionTitle}>Session in Progress</Text>
+              <Text style={styles.timerText}>{formatTime(sessionTimer)}</Text>
+              <TouchableOpacity 
+                style={[styles.button, styles.endButton]}
+                onPress={endSession}
+              >
+                <Text style={styles.buttonText}>End Session</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.statusContainer}>
+              <Text 
+                style={[
+                  styles.statusText, 
+                  equipment.status === 'available' ? styles.availableText : styles.inUseText
+                ]}
+              >
+                {equipment.status === 'available' ? 'AVAILABLE' : 'IN USE'}
+              </Text>
+              
+              {equipment.status === 'available' && (
+                <TouchableOpacity 
+                  style={styles.button}
+                  onPress={startSession}
+                >
+                  <Text style={styles.buttonText}>Start Session</Text>
+                </TouchableOpacity>
+              )}
+              
+              {equipment.status === 'in_use' && (
+                <Text style={styles.inUseMessage}>
+                  This equipment is currently in use by someone else.
+                </Text>
+              )}
             </View>
           )}
-
-          {equipment.location && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Location</Text>
-              <Text style={styles.detailValue}>{equipment.location}</Text>
-            </View>
-          )}
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Status</Text>
-            <Text style={[
-              styles.detailValue,
-              equipment.status === 'available' ? { color: '#2ecc71' } : { color: '#f1c40f' }
-            ]}>
-              {equipment.status === 'available' ? 'Available' : 'In Use'}
-            </Text>
-          </View>
         </View>
-
-        <View style={styles.actionSection}>
-          <TouchableOpacity 
-            style={[
-              styles.actionButton,
-              equipment.status === 'available' ? styles.primaryButton : styles.disabledButton
-            ]}
-            disabled={equipment.status !== 'available'}
-          >
-            <Text style={styles.actionButtonText}>
-              {equipment.status === 'available' ? 'Start Session' : 'Currently In Use'}
-            </Text>
-          </TouchableOpacity>
+        
+        <View style={styles.usageInfo}>
+          <Text style={styles.infoTitle}>Usage Information</Text>
+          <Text style={styles.infoText}>• Wipe down equipment after use</Text>
+          <Text style={styles.infoText}>• 30 minute time limit during peak hours</Text>
+          <Text style={styles.infoText}>• Report any equipment issues to staff</Text>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -140,57 +215,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  backButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#0a7ea4',
-    fontWeight: '600',
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingBottom: 24,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  icon: {
-    fontSize: 64,
-    marginBottom: 16,
+  backButton: {
+    padding: 4,
   },
-  name: {
-    fontSize: 28,
-    fontWeight: '700',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#11181C',
+  },
+  headerRight: {
+    width: 32,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  equipmentDetails: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  equipmentIcon: {
+    fontSize: 48,
     marginBottom: 8,
   },
-  type: {
+  equipmentType: {
     fontSize: 14,
     color: '#7f8c8d',
-    fontWeight: '600',
+    marginBottom: 16,
   },
-  statusBadge: {
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 24,
+  statusContainer: {
     alignItems: 'center',
-  },
-  availableBadge: {
-    backgroundColor: '#d5f4e6',
-  },
-  inUseBadge: {
-    backgroundColor: '#fef5e7',
+    marginTop: 8,
   },
   statusText: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
   availableText: {
     color: '#2ecc71',
@@ -198,65 +276,77 @@ const styles = StyleSheet.create({
   inUseText: {
     color: '#f1c40f',
   },
-  section: {
+  inUseMessage: {
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  sessionContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  sessionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#11181C',
+    marginBottom: 8,
+  },
+  timerText: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#0a7ea4',
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#0a7ea4',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  endButton: {
+    backgroundColor: '#e74c3c',
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  usageInfo: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  sectionTitle: {
+  infoTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#11181C',
-    marginBottom: 16,
-  },
-  detailRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 12,
+    color: '#11181C',
   },
-  detailValue: {
+  infoText: {
     fontSize: 16,
     color: '#11181C',
-    fontWeight: '500',
+    marginBottom: 8,
+    lineHeight: 22,
   },
-  actionSection: {
-    marginBottom: 32,
-  },
-  actionButton: {
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#0a7ea4',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  loadingContainer: {
+  loading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorContainer: {
+  notFoundContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  errorText: {
-    fontSize: 16,
+  notFoundText: {
+    fontSize: 18,
     color: '#7f8c8d',
+    marginBottom: 20,
   },
 });
