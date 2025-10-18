@@ -40,6 +40,15 @@
         }
       ]
     ],
+    "extra": {
+      "firebaseApiKey": "AIzaSyB8ll3C9NdZtqcDrXM-Bv9CglIN_7LRxdE",
+      "firebaseAuthDomain": "wellness-center-hackathon.firebaseapp.com",
+      "firebaseProjectId": "wellness-center-hackathon",
+      "firebaseStorageBucket": "wellness-center-hackathon.firebasestorage.app",
+      "firebaseMessagingSenderId": "82202466445",
+      "firebaseAppId": "1:82202466445:web:852d8363ef1f364957eac4",
+      "firebaseMeasurementId": "G-8K08F9TY1P"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
