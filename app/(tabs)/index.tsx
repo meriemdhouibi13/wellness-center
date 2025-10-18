@@ -1,5 +1,6 @@
 // app/(tabs)/index.tsx
 import EquipmentCard from '@/components/EquipmentCard';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -15,6 +16,7 @@ import { listEquipment } from '@/services/equipment';
 import type { Equipment } from '@/services/types';
 
 export default function HomeScreen() {
+  const { user, profile, loading: authLoading, signOut } = useAuth();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -118,6 +120,12 @@ export default function HomeScreen() {
     }
   };
 
+  if (!authLoading && !user) {
+    // Lazy require to avoid circular during build; using router.Link via imperative push keeps it simple
+    const { Redirect } = require('expo-router');
+    return <Redirect href="/sign-in" />;
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -131,8 +139,8 @@ export default function HomeScreen() {
           <Text style={styles.headerTitle}>Wellness Center</Text>
           <Text style={styles.dateText}>{formattedDate}</Text>
         </View>
-        <TouchableOpacity style={styles.infoButton}>
-          <Text style={styles.infoIcon}>ⓘ</Text>
+        <TouchableOpacity style={styles.infoButton} onPress={() => signOut()}>
+          <Text style={styles.infoIcon}>↩︎</Text>
         </TouchableOpacity>
       </View>
       

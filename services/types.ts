@@ -1,4 +1,5 @@
-export type UserRole = 'patient' | 'provider' | 'admin';
+// Supported app roles. Keep legacy values for forward-compat, add 'member' for this app.
+export type UserRole = 'member' | 'admin' | 'patient' | 'provider';
 
 export interface UserProfile {
   id: string; // uid or custom id
