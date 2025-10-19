@@ -8,18 +8,8 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Import barcode scanner only on native platforms
-import * as ExpoBarCodeScanner from 'expo-barcode-scanner';
-
-// Use conditional to determine if BarCodeScanner should be used
-let BarCodeScanner: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    BarCodeScanner = ExpoBarCodeScanner.BarCodeScanner;
-  } catch (error) {
-    console.error('Error loading barcode scanner:', error);
-  }
-}
+// Import BarCodeScanner directly - will only be used on native platforms
+import { BarCodeScanner } from 'expo-barcode-scanner';
 
 export default function ScanScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -32,14 +22,16 @@ export default function ScanScreen() {
   // Request camera permissions when component mounts
   useEffect(() => {
     // Only request permissions on native platforms
-    if (Platform.OS !== 'web' && BarCodeScanner) {
+    if (Platform.OS !== 'web') {
       const getBarCodeScannerPermissions = async () => {
         try {
-          const { status } = await BarCodeScanner.requestPermissionsAsync();
+          // Import the permission request function dynamically to avoid web issues
+          const { requestPermissionsAsync } = await import('expo-barcode-scanner');
+          const { status } = await requestPermissionsAsync();
           setHasPermission(status === 'granted');
         } catch (error) {
           console.error('Error requesting camera permission:', error);
-          setError('Failed to request camera permissions');
+          setError('Failed to request camera permissions. ' + (error as Error).message);
           setHasPermission(false);
         }
       };
@@ -193,20 +185,16 @@ export default function ScanScreen() {
           </Text>
           <TouchableOpacity 
             style={styles.permissionButton}
-            onPress={() => {
-              if (BarCodeScanner) {
+            onPress={async () => {
+              if (Platform.OS !== 'web') {
                 try {
-                  BarCodeScanner.requestPermissionsAsync()
-                    .then(({status}) => {
-                      setHasPermission(status === 'granted');
-                      if (status === 'granted') {
-                        setError(null);
-                      }
-                    })
-                    .catch(err => {
-                      console.error('Error requesting permissions:', err);
-                      setError('Failed to request camera permissions');
-                    });
+                  const { status } = await BarCodeScanner.requestPermissionsAsync();
+                  setHasPermission(status === 'granted');
+                  if (status === 'granted') {
+                    setError(null);
+                  } else if (status === 'denied') {
+                    setError('Camera access was denied. Please enable it in your device settings.');
+                  }
                 } catch (err) {
                   console.error('Error requesting permissions:', err);
                   setError('Failed to request camera permissions');
