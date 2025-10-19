@@ -56,6 +56,17 @@ export default function FriendsScreen() {
     }
   }, [user?.uid]);
 
+  // Auto-refresh when screen comes into focus
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user?.uid) {
+        loadAllData();
+      }
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [user?.uid]);
+
   async function loadAllData() {
     if (!user?.uid) return;
     
