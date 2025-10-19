@@ -9,10 +9,13 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  FlatList,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import {
   sendFriendRequest,
   getFriendRequests,
@@ -21,8 +24,21 @@ import {
   removeFriend,
   getFriendsActivities,
   getWeeklyLeaderboard,
+  getUserWorkoutTemplates,
+  getFriendsWorkoutTemplates,
+  getUserProgressUpdates,
+  getFriendsProgressUpdates,
+  toggleLikeProgressUpdate,
+  addCommentToProgressUpdate,
 } from '@/services/friends';
-import type { Friend, FriendRequest, Activity, LeaderboardEntry } from '@/services/types';
+import type { 
+  Friend, 
+  FriendRequest, 
+  Activity, 
+  LeaderboardEntry,
+  WorkoutTemplate,
+  ProgressUpdate,
+} from '@/services/types';
 
 export default function FriendsScreen() {
   const [user, setUser] = useState<{ uid: string; displayName?: string; email?: string } | null>(null);
@@ -30,10 +46,19 @@ export default function FriendsScreen() {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [userWorkoutTemplates, setUserWorkoutTemplates] = useState<WorkoutTemplate[]>([]);
+  const [friendsWorkoutTemplates, setFriendsWorkoutTemplates] = useState<WorkoutTemplate[]>([]);
+  const [userProgressUpdates, setUserProgressUpdates] = useState<ProgressUpdate[]>([]);
+  const [friendsProgressUpdates, setFriendsProgressUpdates] = useState<ProgressUpdate[]>([]);
+  const [activeTab, setActiveTab] = useState<'friends' | 'workouts' | 'progress'>('friends');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchEmail, setSearchEmail] = useState('');
   const [searching, setSearching] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [selectedProgressUpdate, setSelectedProgressUpdate] = useState<ProgressUpdate | null>(null);
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -72,17 +97,34 @@ export default function FriendsScreen() {
     if (!user?.uid) return;
     
     try {
-      const [friendsData, requestsData, leaderboardData, activitiesData] = await Promise.all([
+      const [
+        friendsData, 
+        requestsData, 
+        leaderboardData, 
+        activitiesData, 
+        userTemplatesData, 
+        friendsTemplatesData,
+        userProgressData,
+        friendsProgressData
+      ] = await Promise.all([
         getFriends(user.uid),
         getFriendRequests(user.uid),
         getWeeklyLeaderboard(user.uid),
         getFriendsActivities(user.uid, 10),
+        getUserWorkoutTemplates(user.uid),
+        getFriendsWorkoutTemplates(user.uid),
+        getUserProgressUpdates(user.uid),
+        getFriendsProgressUpdates(user.uid, 10),
       ]);
       
       setFriends(friendsData);
       setFriendRequests(requestsData);
       setLeaderboard(leaderboardData);
       setActivities(activitiesData);
+      setUserWorkoutTemplates(userTemplatesData);
+      setFriendsWorkoutTemplates(friendsTemplatesData);
+      setUserProgressUpdates(userProgressData);
+      setFriendsProgressUpdates(friendsProgressData);
     } catch (error) {
       console.error('Error loading friends data:', error);
       Alert.alert('Error', 'Failed to load friends data');
@@ -185,6 +227,65 @@ export default function FriendsScreen() {
       default: return '📝';
     }
   }
+  
+  // Handle viewing workout template details
+  function handleViewTemplate(template: WorkoutTemplate) {
+    // This would typically navigate to a detailed view
+    Alert.alert(
+      template.title,
+      `${template.description}\n\nDifficulty: ${template.difficulty}\nEstimated Time: ${template.estimatedDuration} min\n\nExercises: ${template.exercises.length}`,
+      [
+        { text: 'Close', style: 'cancel' },
+        { 
+          text: 'Use Template', 
+          onPress: () => {
+            // Here you would navigate to workout screen with this template
+            Alert.alert('Success', 'Template added to your workout plan!');
+          } 
+        }
+      ]
+    );
+  }
+  
+  // Handle toggling like on a progress update
+  async function handleLikeProgress(updateId: string) {
+    if (!user?.uid) return;
+    
+    try {
+      await toggleLikeProgressUpdate(updateId, user.uid);
+      await loadAllData(); // Refresh to get updated data
+    } catch (error) {
+      console.error('Error liking update:', error);
+    }
+  }
+  
+  // Handle opening the comment modal for a progress update
+  function handleOpenComments(update: ProgressUpdate) {
+    setSelectedProgressUpdate(update);
+    setCommentModalVisible(true);
+  }
+  
+  // Handle adding a comment to a progress update
+  async function handleAddComment() {
+    if (!user?.uid || !selectedProgressUpdate || !commentText.trim()) return;
+    
+    try {
+      await addCommentToProgressUpdate(
+        selectedProgressUpdate.id,
+        user.uid,
+        user.displayName || 'Unknown User',
+        commentText.trim()
+      );
+      
+      // Clear and close
+      setCommentText('');
+      setCommentModalVisible(false);
+      await loadAllData(); // Refresh to get updated comments
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      Alert.alert('Error', 'Failed to add comment');
+    }
+  }
 
   if (!user?.uid) {
     return (
@@ -210,6 +311,34 @@ export default function FriendsScreen() {
         </Text>
       </View>
 
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'friends' && styles.activeTabButton]} 
+          onPress={() => setActiveTab('friends')}
+        >
+          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
+            Friends
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'workouts' && styles.activeTabButton]} 
+          onPress={() => setActiveTab('workouts')}
+        >
+          <Text style={[styles.tabText, activeTab === 'workouts' && styles.activeTabText]}>
+            Workouts
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'progress' && styles.activeTabButton]} 
+          onPress={() => setActiveTab('progress')}
+        >
+          <Text style={[styles.tabText, activeTab === 'progress' && styles.activeTabText]}>
+            Progress
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0a7ea4" />
@@ -223,11 +352,14 @@ export default function FriendsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0a7ea4']} />
           }
         >
-          {/* Friend Requests Section */}
-          {friendRequests.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Friend Requests ({friendRequests.length})</Text>
-              {friendRequests.map((request) => (
+          {/* Content based on active tab */}
+          {activeTab === 'friends' && (
+            <>
+              {/* Friend Requests Section */}
+              {friendRequests.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Friend Requests ({friendRequests.length})</Text>
+                  {friendRequests.map((request) => (
                 <View key={request.id} style={styles.requestCard}>
                   <View style={styles.friendAvatar}>
                     <Text style={styles.friendAvatarText}>
@@ -403,8 +535,258 @@ export default function FriendsScreen() {
               ))
             )}
           </View>
+            </>
+          )}
+
+          {/* Workout Templates Tab */}
+          {activeTab === 'workouts' && (
+            <>
+              {/* My Workout Templates */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>My Workout Templates</Text>
+                {userWorkoutTemplates.length === 0 ? (
+                  <View style={styles.noFriendsCard}>
+                    <Text style={styles.noFriendsIcon}>💪</Text>
+                    <Text style={styles.noFriendsText}>
+                      You haven't created any workout templates yet.
+                    </Text>
+                  </View>
+                ) : (
+                  userWorkoutTemplates.map(template => (
+                    <TouchableOpacity
+                      key={template.id}
+                      style={styles.workoutCard}
+                      onPress={() => handleViewTemplate(template)}
+                    >
+                      <View style={styles.workoutHeader}>
+                        <Text style={styles.workoutTitle}>{template.title}</Text>
+                        <Text style={styles.workoutDifficulty}>{template.difficulty}</Text>
+                      </View>
+                      <Text style={styles.workoutDescription} numberOfLines={2}>
+                        {template.description}
+                      </Text>
+                      <View style={styles.workoutFooter}>
+                        <Text style={styles.workoutExercises}>
+                          {template.exercises.length} exercises • {template.estimatedDuration} min
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+                
+                <TouchableOpacity style={styles.createButton} onPress={() => Alert.alert('Create Template', 'Create a new workout template to share with friends')}>
+                  <Text style={styles.createButtonText}>Create New Template</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {/* Friends' Workout Templates */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Friends' Templates</Text>
+                {friendsWorkoutTemplates.length === 0 ? (
+                  <View style={styles.noFriendsCard}>
+                    <Text style={styles.noFriendsIcon}>👥</Text>
+                    <Text style={styles.noFriendsText}>
+                      No shared templates from friends yet.
+                    </Text>
+                  </View>
+                ) : (
+                  friendsWorkoutTemplates.map(template => (
+                    <TouchableOpacity
+                      key={template.id}
+                      style={styles.workoutCard}
+                      onPress={() => handleViewTemplate(template)}
+                    >
+                      <View style={styles.workoutHeader}>
+                        <Text style={styles.workoutTitle}>{template.title}</Text>
+                        <Text style={styles.workoutCreator}>By {template.userName}</Text>
+                      </View>
+                      <Text style={styles.workoutDescription} numberOfLines={2}>
+                        {template.description}
+                      </Text>
+                      <View style={styles.workoutFooter}>
+                        <Text style={styles.workoutExercises}>
+                          {template.exercises.length} exercises • {template.estimatedDuration} min
+                        </Text>
+                        <Text style={styles.workoutLikes}>❤️ {template.likes}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Progress Sharing Tab */}
+          {activeTab === 'progress' && (
+            <>
+              {/* Share Progress */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Share Progress</Text>
+                <TouchableOpacity 
+                  style={styles.createButton}
+                  onPress={() => Alert.alert('Share Progress', 'Share your fitness progress with friends')}
+                >
+                  <Text style={styles.createButtonText}>Share New Update</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* My Progress Updates */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>My Progress</Text>
+                {userProgressUpdates.length === 0 ? (
+                  <View style={styles.noFriendsCard}>
+                    <Text style={styles.noFriendsIcon}>📈</Text>
+                    <Text style={styles.noFriendsText}>
+                      You haven't shared any progress updates yet.
+                    </Text>
+                  </View>
+                ) : (
+                  userProgressUpdates.map(update => (
+                    <View key={update.id} style={styles.progressCard}>
+                      <View style={styles.progressHeader}>
+                        <Text style={styles.progressTitle}>{update.title}</Text>
+                        <Text style={styles.progressDate}>
+                          {formatActivityTime(update.createdAt.toMillis())}
+                        </Text>
+                      </View>
+                      <Text style={styles.progressDescription}>
+                        {update.description}
+                      </Text>
+                      {update.mediaUrls && update.mediaUrls.length > 0 && (
+                        <Image 
+                          source={{ uri: update.mediaUrls[0] }} 
+                          style={styles.progressImage} 
+                          resizeMode="cover" 
+                        />
+                      )}
+                      <View style={styles.progressFooter}>
+                        <TouchableOpacity 
+                          style={styles.progressAction}
+                          onPress={() => handleLikeProgress(update.id)}
+                        >
+                          <Text>❤️ {update.likes.length}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.progressAction}
+                          onPress={() => handleOpenComments(update)}
+                        >
+                          <Text>💬 {update.comments.length}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+              
+              {/* Friends' Progress Updates */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Friends' Progress</Text>
+                {friendsProgressUpdates.length === 0 ? (
+                  <View style={styles.noFriendsCard}>
+                    <Text style={styles.noFriendsIcon}>👥</Text>
+                    <Text style={styles.noFriendsText}>
+                      No progress updates from friends yet.
+                    </Text>
+                  </View>
+                ) : (
+                  friendsProgressUpdates.map(update => (
+                    <View key={update.id} style={styles.progressCard}>
+                      <View style={styles.progressHeader}>
+                        <View style={styles.progressUser}>
+                          <Text style={styles.progressUserLetter}>
+                            {update.userName.charAt(0)}
+                          </Text>
+                          <Text style={styles.progressUserName}>{update.userName}</Text>
+                        </View>
+                        <Text style={styles.progressDate}>
+                          {formatActivityTime(update.createdAt.toMillis())}
+                        </Text>
+                      </View>
+                      <Text style={styles.progressTitle}>{update.title}</Text>
+                      <Text style={styles.progressDescription}>
+                        {update.description}
+                      </Text>
+                      {update.mediaUrls && update.mediaUrls.length > 0 && (
+                        <Image 
+                          source={{ uri: update.mediaUrls[0] }} 
+                          style={styles.progressImage} 
+                          resizeMode="cover" 
+                        />
+                      )}
+                      <View style={styles.progressFooter}>
+                        <TouchableOpacity 
+                          style={styles.progressAction}
+                          onPress={() => handleLikeProgress(update.id)}
+                        >
+                          <Text>❤️ {update.likes.length}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.progressAction}
+                          onPress={() => handleOpenComments(update)}
+                        >
+                          <Text>💬 {update.comments.length}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            </>
+          )}
         </ScrollView>
       )}
+
+      {/* Comment Modal */}
+      <Modal
+        visible={commentModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCommentModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Comments</Text>
+            
+            <FlatList
+              data={selectedProgressUpdate?.comments || []}
+              keyExtractor={item => item.id}
+              style={styles.commentsList}
+              renderItem={({ item }) => (
+                <View style={styles.commentItem}>
+                  <Text style={styles.commentUser}>{item.userName}</Text>
+                  <Text style={styles.commentText}>{item.content}</Text>
+                </View>
+              )}
+              ListEmptyComponent={() => (
+                <Text style={styles.noCommentsText}>No comments yet</Text>
+              )}
+            />
+            
+            <View style={styles.addCommentContainer}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Add a comment..."
+                value={commentText}
+                onChangeText={setCommentText}
+              />
+              <TouchableOpacity
+                style={styles.commentButton}
+                onPress={handleAddComment}
+                disabled={!commentText.trim()}
+              >
+                <Text style={styles.commentButtonText}>Send</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setCommentModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -706,5 +1088,251 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 10,
+    marginVertical: 10,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    borderBottomWidth: 3,
+    borderBottomColor: '#0a7ea4',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  activeTabText: {
+    fontWeight: '600',
+    color: '#0a7ea4',
+  },
+  workoutCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  workoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  workoutTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  workoutDifficulty: {
+    fontSize: 14,
+    color: '#0a7ea4',
+    backgroundColor: '#e6f7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    textTransform: 'capitalize',
+  },
+  workoutCreator: {
+    fontSize: 14,
+    color: '#666',
+  },
+  workoutDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  workoutFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  workoutExercises: {
+    fontSize: 14,
+    color: '#666',
+  },
+  workoutLikes: {
+    fontSize: 14,
+    color: '#666',
+  },
+  createButton: {
+    backgroundColor: '#0a7ea4',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  progressCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressUserLetter: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    backgroundColor: '#0a7ea4',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    textAlign: 'center',
+    lineHeight: 30,
+    marginRight: 8,
+  },
+  progressUserName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  progressTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  progressDate: {
+    fontSize: 14,
+    color: '#999',
+  },
+  progressDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  progressImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  progressFooter: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 12,
+  },
+  progressAction: {
+    marginRight: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 30,
+    minHeight: '60%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  commentsList: {
+    maxHeight: 300,
+  },
+  commentItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  commentUser: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  noCommentsText: {
+    textAlign: 'center',
+    padding: 20,
+    color: '#999',
+  },
+  addCommentContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+  commentButton: {
+    backgroundColor: '#0a7ea4',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginLeft: 8,
+  },
+  commentButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontWeight: 'bold',
+    color: '#333',
   },
 });

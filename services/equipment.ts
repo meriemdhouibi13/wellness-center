@@ -29,6 +29,27 @@ export async function logEquipmentUsageEnd(equipmentId: string, usageId: string)
   const start = typeof data.startTime === 'number' ? data.startTime : Date.now();
   const durationMinutes = Math.max(1, Math.round((now - start) / 60000));
   await updateDoc(ref, { endTime: now, durationMinutes });
+  
+  // Get equipment details for notification
+  const equipmentSnap = await getDoc(doc(db, EQUIPMENT, equipmentId));
+  if (equipmentSnap.exists()) {
+    const equipment = equipmentSnap.data() as Equipment;
+    
+    // Import at runtime to avoid circular dependency
+    const { markEquipmentAvailable } = await import('./waitlist');
+    
+    // Mark equipment as available and notify next person in waitlist
+    if (equipment.waitlistCount && equipment.waitlistCount > 0) {
+      await markEquipmentAvailable(equipmentId, equipment.name);
+    } else {
+      // No one waiting, just mark as available
+      await updateDoc(doc(db, EQUIPMENT, equipmentId), {
+        status: 'available',
+        updatedAt: Date.now()
+      });
+    }
+  }
+  
   const updated = await getDoc(ref);
   return updated.exists() ? ({ id: updated.id, ...(updated.data() as any) } as EquipmentUsage) : null;
 }

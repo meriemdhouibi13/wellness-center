@@ -112,6 +112,58 @@ export interface LeaderboardEntry {
   rank: number;
 }
 
+// Workout Template types
+export interface WorkoutExercise {
+  name: string;
+  sets: number;
+  reps: number;
+  equipment?: string;
+  duration?: number; // in minutes (for cardio/timed exercises)
+  notes?: string;
+}
+
+export interface WorkoutTemplate {
+  id: string;
+  userId: string;
+  userName: string;
+  title: string;
+  description: string;
+  exercises: WorkoutExercise[];
+  targetMuscles: string[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedDuration: number; // in minutes
+  createdAt: any; // Firestore Timestamp
+  isPublic: boolean;
+  likes: number;
+  usageCount: number;
+}
+
+// Progress Sharing types
+export interface ProgressUpdate {
+  id: string;
+  userId: string;
+  userName: string;
+  type: 'before_after' | 'milestone' | 'achievement' | 'weight' | 'measurement';
+  title: string;
+  description: string;
+  mediaUrls?: string[]; // URLs to photos/videos
+  metrics?: {
+    [key: string]: number | string; // For weights, measurements, etc.
+  };
+  createdAt: any; // Firestore Timestamp
+  isPublic: boolean;
+  likes: string[]; // Array of userIds who liked
+  comments: ProgressComment[];
+}
+
+export interface ProgressComment {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: any; // Firestore Timestamp
+}
+
 // Waitlist feature types
 export type WaitlistStatus = 'waiting' | 'notified' | 'claimed' | 'expired';
 

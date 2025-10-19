@@ -99,6 +99,30 @@ export async function scheduleNotification(
 }
 
 /**
+ * Get all received notifications
+ */
+export async function getAllReceivedNotifications(): Promise<Notifications.Notification[]> {
+  try {
+    const notifications = await Notifications.getAllDeliveredNotificationsAsync();
+    return notifications;
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Dismiss a notification
+ */
+export async function dismissNotification(identifier: string): Promise<void> {
+  try {
+    await Notifications.dismissNotificationAsync(identifier);
+  } catch (error) {
+    console.error('Error dismissing notification:', error);
+  }
+}
+
+/**
  * Cancel a scheduled notification
  */
 export async function cancelScheduledNotification(identifier: string): Promise<void> {
@@ -125,6 +149,7 @@ export async function cancelAllScheduledNotifications(): Promise<void> {
  */
 export async function setupNotificationCategories(): Promise<void> {
   if (Platform.OS === 'ios') {
+    // Set up waitlist notification category
     await Notifications.setNotificationCategoryAsync('waitlist', [
       {
         identifier: 'claim',
@@ -136,6 +161,24 @@ export async function setupNotificationCategories(): Promise<void> {
       {
         identifier: 'dismiss',
         buttonTitle: 'Later',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+    ]);
+    
+    // Set up equipment available notification category
+    await Notifications.setNotificationCategoryAsync('equipment_available', [
+      {
+        identifier: 'claim',
+        buttonTitle: 'Claim Equipment',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+      {
+        identifier: 'skip',
+        buttonTitle: 'Skip',
         options: {
           opensAppToForeground: false,
         },
