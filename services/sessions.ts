@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDocs, limit, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { UserSession } from './types';
+import { notifyNextInWaitlist } from './waitlist';
 
 function colRef(uid: string) {
   return collection(doc(db, 'users', uid), 'sessions');
@@ -15,16 +16,29 @@ export async function getOpenSession(uid: string): Promise<UserSession | null> {
   return { id: d.id, ...data } as UserSession;
 }
 
-export async function startSession(uid: string): Promise<UserSession> {
+export async function startSession(
+  uid: string,
+  equipmentId?: string,
+  equipmentName?: string
+): Promise<UserSession> {
   const open = await getOpenSession(uid);
   if (open) throw new Error('You already have an active session');
   const now = Date.now();
   const docRef = await addDoc(colRef(uid), {
     startTime: now,
     endTime: null,
+    equipmentId,
+    equipmentName,
     createdAt: now,
   });
-  return { id: docRef.id, startTime: now, endTime: null, createdAt: now };
+  return { 
+    id: docRef.id, 
+    startTime: now, 
+    endTime: null, 
+    equipmentId,
+    equipmentName,
+    createdAt: now 
+  };
 }
 
 export async function endSession(uid: string): Promise<UserSession> {
@@ -36,6 +50,17 @@ export async function endSession(uid: string): Promise<UserSession> {
     endTime: end,
     durationMinutes,
   });
+  
+  // Notify next person in waitlist if equipment was tracked
+  if (open.equipmentId) {
+    try {
+      await notifyNextInWaitlist(open.equipmentId);
+    } catch (error) {
+      console.error('Error notifying waitlist:', error);
+      // Don't fail the session end if waitlist notification fails
+    }
+  }
+  
   return { ...open, endTime: end, durationMinutes };
 }
 

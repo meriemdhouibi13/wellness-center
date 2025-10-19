@@ -305,6 +305,8 @@ export default function HomeScreen() {
               type={item.type}
               status={item.status}
               hasMalfunction={item.hasMalfunction}
+              waitlistCount={item.waitlistCount || 0}
+              onWaitlistChange={loadEquipmentData}
             />
           ))}
         </ScrollView>

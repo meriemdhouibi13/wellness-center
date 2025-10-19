@@ -41,14 +41,32 @@ export interface Equipment {
   description?: string;
   location?: string;
   hasMalfunction?: boolean;
+  waitlistCount?: number; // number of people waiting
+  waitlistEnabled?: boolean; // can people join waitlist (default: true)
   createdAt: number;
   updatedAt?: number;
 }
 
 export interface UserSession {
   id: string;
+  equipmentId?: string; // which equipment was used
+  equipmentName?: string; // name of equipment
   startTime: number; // ms since epoch
   endTime: number | null; // null when active
   durationMinutes?: number; // set on end
   createdAt: number;
+}
+
+export type WaitlistStatus = 'waiting' | 'notified' | 'claimed' | 'expired';
+
+export interface WaitlistEntry {
+  id: string;
+  equipmentId: string;
+  userId: string;
+  userName: string;
+  joinedAt: number; // ms since epoch
+  position: number; // position in line (1-based)
+  notified: boolean; // has user been notified?
+  expiresAt?: number; // notification expires if not claimed (ms since epoch)
+  status: WaitlistStatus;
 }
