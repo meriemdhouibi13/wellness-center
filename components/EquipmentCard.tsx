@@ -1,7 +1,10 @@
 // src/components/EquipmentCard.tsx
+import { useAuth } from '@/contexts/AuthContext';
+import type { WaitlistEntry } from '@/services/types';
+import { getUserWaitlistEntry, joinWaitlist, leaveWaitlist } from '@/services/waitlist';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Define props interface
 interface EquipmentCardProps {
@@ -10,6 +13,8 @@ interface EquipmentCardProps {
   type: string;
   status: 'available' | 'in_use' | 'broken';
   hasMalfunction?: boolean;
+  waitlistCount?: number;
+  onWaitlistChange?: () => void;
 }
 
 const EquipmentCard: React.FC<EquipmentCardProps> = ({
@@ -18,8 +23,31 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   type,
   status,
   hasMalfunction = false,
+  waitlistCount = 0,
+  onWaitlistChange,
 }) => {
   const router = useRouter();
+  
+  // Try to get user, but don't fail if AuthProvider isn't available
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch {
+    // Auth not available, user features will be disabled
+  }
+  
+  const [myWaitlistEntry, setMyWaitlistEntry] = useState<WaitlistEntry | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Check if user is on waitlist for this equipment
+  useEffect(() => {
+    if (user?.uid && status === 'in_use') {
+      getUserWaitlistEntry(id, user.uid)
+        .then(setMyWaitlistEntry)
+        .catch(console.error);
+    }
+  }, [id, user?.uid, status]);
   
   // Get the appropriate icon based on equipment type
   const getEquipmentIcon = () => {
@@ -52,6 +80,46 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
     if (status === 'broken') return '#2c3e50';
     if (status === 'in_use') return '#f1c40f';
     return '#2ecc71';
+  };
+  
+  // Handle joining waitlist
+  const handleJoinWaitlist = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to join the waitlist');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const entry = await joinWaitlist(id, user.uid, user.displayName || 'User');
+      setMyWaitlistEntry(entry);
+      Alert.alert(
+        'Joined Waitlist!',
+        `You're #${entry.position} in line for ${name}`
+      );
+      onWaitlistChange?.();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to join waitlist');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle leaving waitlist
+  const handleLeaveWaitlist = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      await leaveWaitlist(id, user.uid);
+      setMyWaitlistEntry(null);
+      Alert.alert('Left Waitlist', 'You have been removed from the waitlist');
+      onWaitlistChange?.();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to leave waitlist');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   // Handle card press
@@ -94,6 +162,46 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
       ]}>
         {getStatusText()}
       </Text>
+      
+      {/* Waitlist Info */}
+      {status === 'in_use' && waitlistCount > 0 && (
+        <View style={styles.waitlistInfo}>
+          <Text style={styles.waitlistIcon}>👥</Text>
+          <Text style={styles.waitlistText}>
+            {waitlistCount} {waitlistCount === 1 ? 'person' : 'people'} waiting
+          </Text>
+        </View>
+      )}
+      
+      {/* Show user's position if on waitlist */}
+      {myWaitlistEntry && (
+        <View style={styles.myPositionBadge}>
+          <Text style={styles.myPositionText}>
+            You&apos;re #{myWaitlistEntry.position} in line
+          </Text>
+        </View>
+      )}
+      
+      {/* Waitlist Button */}
+      {status === 'in_use' && user && (
+        <TouchableOpacity
+          style={[
+            styles.waitlistButton,
+            myWaitlistEntry && styles.waitlistButtonLeave,
+            isLoading && styles.waitlistButtonDisabled
+          ]}
+          onPress={myWaitlistEntry ? handleLeaveWaitlist : handleJoinWaitlist}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.waitlistButtonText}>
+              {myWaitlistEntry ? 'Leave Waitlist' : 'Join Waitlist'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
       
       <Text style={styles.actionText}>
         {status === 'broken' 
@@ -169,6 +277,56 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     marginTop: 'auto',
     textAlign: 'center',
+  },
+  waitlistInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  waitlistIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  waitlistText: {
+    fontSize: 12,
+    color: '#555',
+    fontWeight: '500',
+  },
+  myPositionBadge: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  myPositionText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  waitlistButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  waitlistButtonLeave: {
+    backgroundColor: '#e74c3c',
+  },
+  waitlistButtonDisabled: {
+    opacity: 0.6,
+  },
+  waitlistButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

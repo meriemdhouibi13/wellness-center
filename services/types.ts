@@ -43,13 +43,18 @@ export interface Equipment {
   hasMalfunction?: boolean;
   createdAt: number;
   updatedAt?: number;
+  waitlistCount?: number;
+  waitlistEnabled?: boolean;
 }
 
 export interface UserSession {
   id: string;
+  userId?: string;
   startTime: number; // ms since epoch
   endTime: number | null; // null when active
   durationMinutes?: number; // set on end
+  equipmentId?: string;
+  equipmentName?: string;
   createdAt: number;
 }
 
@@ -100,4 +105,19 @@ export interface LeaderboardEntry {
   totalSessions: number;
   totalMinutes: number;
   rank: number;
+}
+
+// Waitlist feature types
+export type WaitlistStatus = 'waiting' | 'notified' | 'claimed' | 'expired';
+
+export interface WaitlistEntry {
+  id: string;
+  equipmentId: string;
+  userId: string;
+  userName: string;
+  joinedAt: any; // Firestore Timestamp
+  position: number;
+  status: WaitlistStatus;
+  notified: boolean;
+  expiresAt: any | null; // Firestore Timestamp
 }

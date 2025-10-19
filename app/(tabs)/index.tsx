@@ -6,13 +6,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -305,6 +305,8 @@ export default function HomeScreen() {
               type={item.type}
               status={item.status}
               hasMalfunction={item.hasMalfunction}
+              waitlistCount={item.waitlistCount || 0}
+              onWaitlistChange={loadEquipmentData}
             />
           ))}
         </ScrollView>
