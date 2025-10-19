@@ -1,4 +1,4 @@
-// src/components/EquipmentCard.tsx
+﻿// src/components/EquipmentCard.tsx
 import { useAuth } from '@/contexts/AuthContext';
 import type { WaitlistEntry } from '@/services/types';
 import { getEstimatedWaitTime, getUserWaitlistEntry, joinWaitlist, leaveWaitlist } from '@/services/waitlist';

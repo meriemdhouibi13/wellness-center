@@ -1,44 +1,44 @@
-import React, { useState, useEffect } from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  RefreshControl,
-  Modal,
-  FlatList,
-  Image,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import {
-  sendFriendRequest,
+  addCommentToProgressUpdate,
   getFriendRequests,
-  respondToFriendRequest,
   getFriends,
-  removeFriend,
   getFriendsActivities,
-  getWeeklyLeaderboard,
-  getUserWorkoutTemplates,
+  getFriendsProgressUpdates,
   getFriendsWorkoutTemplates,
   getUserProgressUpdates,
-  getFriendsProgressUpdates,
+  getUserWorkoutTemplates,
+  getWeeklyLeaderboard,
+  removeFriend,
+  respondToFriendRequest,
+  sendFriendRequest,
   toggleLikeProgressUpdate,
-  addCommentToProgressUpdate,
 } from '@/services/friends';
-import type { 
-  Friend, 
-  FriendRequest, 
-  Activity, 
+import type {
+  Activity,
+  Friend,
+  FriendRequest,
   LeaderboardEntry,
-  WorkoutTemplate,
   ProgressUpdate,
+  WorkoutTemplate,
 } from '@/services/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FriendsScreen() {
   const [user, setUser] = useState<{ uid: string; displayName?: string; email?: string } | null>(null);
