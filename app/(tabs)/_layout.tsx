@@ -5,12 +5,13 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/contexts/AuthContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  
+  // For now we'll just show the admin tab to everyone for testing purposes
+  // In production you would implement proper role checking
+  const isAdmin = true;
 
   return (
     <Tabs

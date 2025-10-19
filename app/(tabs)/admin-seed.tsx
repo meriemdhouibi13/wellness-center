@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { seedClasses, clearDemoData } from '@/services/seed';
-import { useAuth } from '@/contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminSeedScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState('');
-  const { user, profile } = useAuth();
+  const [user, setUser] = useState<{ uid: string } | null>(null);
   const insets = useSafeAreaInsets();
+
+  // Load user on mount
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const sessionStr = await AsyncStorage.getItem('auth:session');
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr);
+          setUser({ uid: session.uid });
+        }
+      } catch (error) {
+        console.log('Error loading user:', error);
+      }
+    };
+    
+    loadUser();
+  }, []);
 
   const handleGenerateSampleClasses = async () => {
     if (!user) {
