@@ -43,9 +43,12 @@ export default function ScanScreen() {
         }
       };
       getBarCodeScannerPermissions();
-    } else if (Platform.OS === 'web') {
-      // On web, immediately set hasPermission to false
+    } else if (Platform.OS === 'web' || !BarCodeScanner) {
+      // On web or if BarCodeScanner is not available, set hasPermission to false
       setHasPermission(false);
+      if (!BarCodeScanner && Platform.OS !== 'web') {
+        setError('Camera scanner is not available. Please ensure you are running on a physical device or properly configured emulator.');
+      }
     }
   }, []);
 
@@ -189,30 +192,40 @@ export default function ScanScreen() {
           <View style={styles.headerRight} />
         </View>
         <View style={styles.centerContainer}>
-          <Text style={styles.permissionText}>No access to camera</Text>
+          <Text style={styles.permissionText}>Camera Not Available</Text>
           <Text style={styles.permissionSubtext}>
-            {error || 'Camera permission is required to scan QR codes.'}
+            {error || (!BarCodeScanner 
+              ? 'QR code scanning requires a development build or physical device. It is not available in Expo Go.' 
+              : 'Camera permission is required to scan QR codes.')}
           </Text>
-          <TouchableOpacity 
-            style={styles.permissionButton}
-            onPress={async () => {
-              if (Platform.OS !== 'web') {
-                try {
-                  const { status } = await BarCodeScanner.requestPermissionsAsync();
-                  setHasPermission(status === 'granted');
-                  if (status === 'granted') {
-                    setError(null);
-                  } else if (status === 'denied') {
-                    setError('Camera access was denied. Please enable it in your device settings.');
+          {BarCodeScanner && !error?.includes('not available') && (
+            <TouchableOpacity 
+              style={styles.permissionButton}
+              onPress={async () => {
+                if (Platform.OS !== 'web' && BarCodeScanner) {
+                  try {
+                    const { status } = await BarCodeScanner.requestPermissionsAsync();
+                    setHasPermission(status === 'granted');
+                    if (status === 'granted') {
+                      setError(null);
+                    } else if (status === 'denied') {
+                      setError('Camera access was denied. Please enable it in your device settings.');
+                    }
+                  } catch (err) {
+                    console.error('Error requesting permissions:', err);
+                    setError('Failed to request camera permissions');
                   }
-                } catch (err) {
-                  console.error('Error requesting permissions:', err);
-                  setError('Failed to request camera permissions');
                 }
-              }
-            }}
+              }}
+            >
+              <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={[styles.permissionButton, { backgroundColor: '#6c757d', marginTop: 10 }]}
+            onPress={() => router.back()}
           >
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <Text style={styles.permissionButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>

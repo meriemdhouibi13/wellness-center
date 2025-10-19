@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { listSessions } from '@/services/sessions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function StatsScreen() {
   const [user, setUser] = useState<{ uid: string; displayName?: string } | null>(null);
@@ -25,23 +25,7 @@ export default function StatsScreen() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!user?.uid) {
-      setLoading(false);
-      return;
-    }
-
-    loadStats();
-    
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(() => {
-      loadStats();
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [user?.uid]);
-
-  async function loadStats() {
+  const loadStats = React.useCallback(async () => {
     if (!user?.uid) return;
     
     try {
@@ -85,7 +69,23 @@ export default function StatsScreen() {
       console.error('Error loading stats:', error);
       setLoading(false);
     }
-  }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    loadStats();
+    
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(() => {
+      loadStats();
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user?.uid, loadStats]);
 
   if (!user?.uid) {
     return (

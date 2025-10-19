@@ -1,7 +1,7 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { initializeFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import Constants from 'expo-constants';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { initializeFirestore } from 'firebase/firestore';
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, string | undefined>;
 
@@ -38,4 +38,4 @@ try {
   // Continue without Firebase
 }
 
-export { db, auth };
+export { auth, db };

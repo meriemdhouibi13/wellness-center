@@ -1,20 +1,20 @@
 // app/(tabs)/index.tsx
 import EquipmentCard from '@/components/EquipmentCard';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Alert
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { listEquipment } from '@/services/equipment';
 import type { Equipment } from '@/services/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -46,25 +46,7 @@ export default function HomeScreen() {
     { id: '2', name: 'Yoga Studio', reason: 'Low usage now' },
   ];
   
-  useEffect(() => {
-    // Load username from storage
-    AsyncStorage.getItem('username').then((name) => {
-      if (name) setUsername(name);
-    });
-
-    // Load equipment data
-    loadEquipmentData();
-    
-    // Auto-refresh every 5 seconds to show real-time updates
-    const interval = setInterval(() => {
-      loadEquipmentData();
-    }, 5000);
-    
-    // Cleanup interval on unmount
-    return () => clearInterval(interval);
-  }, []);
-
-  async function loadEquipmentData() {
+  const loadEquipmentData = React.useCallback(async () => {
     try {
       // Fetch equipment from Firebase (no loading state changes during auto-refresh)
       const equipmentData = await listEquipment();
@@ -107,7 +89,25 @@ export default function HomeScreen() {
         setIsInitialLoad(false);
       }
     }
-  }
+  }, [isInitialLoad]);
+
+  useEffect(() => {
+    // Load username from storage
+    AsyncStorage.getItem('username').then((name) => {
+      if (name) setUsername(name);
+    });
+
+    // Load equipment data
+    loadEquipmentData();
+    
+    // Auto-refresh every 5 seconds to show real-time updates
+    const interval = setInterval(() => {
+      loadEquipmentData();
+    }, 5000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [loadEquipmentData]);
 
   // Handle quick action button presses
   const handleQuickAction = (action: string) => {
