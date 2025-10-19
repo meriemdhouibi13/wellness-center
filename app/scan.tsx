@@ -8,8 +8,17 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Import BarCodeScanner directly - will only be used on native platforms
-import { BarCodeScanner } from 'expo-barcode-scanner';
+// Conditionally import BarCodeScanner only on native platforms
+let BarCodeScanner: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const BarcodeScanner = require('expo-barcode-scanner');
+    BarCodeScanner = BarcodeScanner.BarCodeScanner;
+  } catch (error) {
+    console.warn('BarCodeScanner not available:', error);
+  }
+}
 
 export default function ScanScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -22,12 +31,10 @@ export default function ScanScreen() {
   // Request camera permissions when component mounts
   useEffect(() => {
     // Only request permissions on native platforms
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && BarCodeScanner) {
       const getBarCodeScannerPermissions = async () => {
         try {
-          // Import the permission request function dynamically to avoid web issues
-          const { requestPermissionsAsync } = await import('expo-barcode-scanner');
-          const { status } = await requestPermissionsAsync();
+          const { status } = await BarCodeScanner.requestPermissionsAsync();
           setHasPermission(status === 'granted');
         } catch (error) {
           console.error('Error requesting camera permission:', error);
@@ -36,6 +43,9 @@ export default function ScanScreen() {
         }
       };
       getBarCodeScannerPermissions();
+    } else if (Platform.OS === 'web') {
+      // On web, immediately set hasPermission to false
+      setHasPermission(false);
     }
   }, []);
 
