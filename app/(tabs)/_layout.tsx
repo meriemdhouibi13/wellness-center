@@ -5,21 +5,12 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const [isAdmin, setIsAdmin] = React.useState(false);
-  
-  // Check if user is admin on mount
-  React.useEffect(() => {
-    AsyncStorage.getItem('auth:session').then((sessionStr) => {
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr);
-        setIsAdmin(session.role === 'admin');
-      }
-    });
-  }, []);
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <Tabs
