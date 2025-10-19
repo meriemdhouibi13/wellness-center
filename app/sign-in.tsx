@@ -5,12 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { reloadProfile } from '@/services/auth';
 
 export default function SignInScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [roleDetail, setRoleDetail] = useState<'community' | 'student' | 'athlete'>('community');
   const [isSignUp, setIsSignUp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +51,9 @@ export default function SignInScreen() {
             name: name.trim(),
             email: email.trim(),
             role: 'member',
+            roleDetail: roleDetail,
+            bio: '',
+            avatarUrl: '',
             createdAt: Date.now(),
           });
         }
@@ -64,7 +69,10 @@ export default function SignInScreen() {
           createdAt: Date.now()
         }));
         await AsyncStorage.setItem('username', name.trim());
-        
+
+        // Notify app about new profile so AuthContext and header update
+        try { await reloadProfile(uid); } catch (e) {}
+
         router.replace('/(tabs)');
       } else {
         // Sign in with Firebase Auth REST API
@@ -98,7 +106,10 @@ export default function SignInScreen() {
           createdAt: Date.now()
         }));
         await AsyncStorage.setItem('username', displayName);
-        
+
+        // Notify app about new profile so AuthContext and header update
+        try { await reloadProfile(uid); } catch (e) {}
+
         router.replace('/(tabs)');
       }
     } catch (e: any) {
@@ -122,6 +133,23 @@ export default function SignInScreen() {
             autoCapitalize="words"
           />
         )}
+        {isSignUp && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            {([
+              { key: 'community', label: 'Community' },
+              { key: 'student', label: 'Student' },
+              { key: 'athlete', label: 'Athlete' },
+            ] as const).map((r) => (
+              <TouchableOpacity
+                key={r.key}
+                onPress={() => setRoleDetail(r.key as any)}
+                style={[styles.roleOption, roleDetail === r.key ? styles.roleSelected : null]}
+              >
+                <Text style={roleDetail === r.key ? styles.roleTextSelected : styles.roleText}>{r.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
         <TextInput 
           value={email} 
           onChangeText={setEmail} 
@@ -138,10 +166,10 @@ export default function SignInScreen() {
           style={styles.input} 
         />
         <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={busy}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isSignUp ? 'Sign up' : 'Sign in'}</Text>}
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isSignUp ? 'Sign up' : 'Log In'}</Text>}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)}>
-          <Text style={styles.link}>{isSignUp ? 'Have an account? Sign in' : "New here? Create an account"}</Text>
+          <Text style={styles.link}>{isSignUp ? 'Have an account? Log In' : "New here? Create an account"}</Text>
         </TouchableOpacity>
       </View>
       <TouchableOpacity onPress={() => router.push('/(tabs)')}>
@@ -161,4 +189,8 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontWeight: '600' },
   link: { color: '#0a7ea4', textAlign: 'center', marginTop: 12 },
   skip: { color: '#7f8c8d', textAlign: 'center', marginTop: 20 },
+  roleOption: { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', alignItems: 'center', marginHorizontal: 4 },
+  roleSelected: { backgroundColor: '#0a7ea4', borderColor: '#0a7ea4' },
+  roleText: { color: '#111' },
+  roleTextSelected: { color: '#fff', fontWeight: '700' },
 });

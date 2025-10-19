@@ -2,6 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ROUTINES: Record<string, Record<string, string[]>> = {
   chest: {
@@ -41,6 +42,10 @@ export default function GroupRoutines() {
   const router = useRouter();
   const name = Array.isArray(group) ? group[0] : group ?? 'unknown';
   const routines = ROUTINES[name] ?? ROUTINES['chest'];
+  // Save last viewed routine group so profile can link back to it
+  React.useEffect(() => {
+    AsyncStorage.setItem('last:routineGroup', name).catch(() => {});
+  }, [name]);
 
   return (
     <View style={styles.container}>

@@ -23,6 +23,8 @@ export async function ensureUserProfile(uid: string, data: Partial<UserProfile>)
     name: data.name ?? 'New User',
     email: data.email ?? '',
     role: (data.role as UserRole) ?? 'member',
+    roleDetail: (data.roleDetail as any) ?? undefined,
+    avatarUrl: (data.avatarUrl as any) ?? undefined,
     createdAt: Date.now(),
   };
   if (!snap.exists()) {
@@ -31,6 +33,15 @@ export async function ensureUserProfile(uid: string, data: Partial<UserProfile>)
   }
   const merged = { ...base, ...(snap.data() as any) } as UserProfile;
   return merged;
+}
+
+// Force reload of profile for subscribers
+export async function reloadProfile(uid: string) {
+  const snap = await getDoc(doc(db, USERS, uid));
+  const profile = (snap.exists() ? (snap.data() as UserProfile) : null) as UserProfile | null;
+  const session = await loadSession();
+  notify({ user: session ? { uid: session.uid, email: session.email, displayName: session.displayName } : null, profile, loading: false });
+  return profile;
 }
 
 export async function emailPasswordSignUp(email: string, password: string, name?: string, role: UserRole = 'member') {

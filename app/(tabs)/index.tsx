@@ -5,6 +5,10 @@ import type { Equipment } from '@/services/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/AuthContext';
+import { Image } from 'react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +19,7 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function HomeScreen() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -24,6 +29,31 @@ export default function HomeScreen() {
   const router = useRouter();
   const [currentDate] = useState(new Date());
   const [username, setUsername] = useState('Guest');
+  const { profile } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const loadSessionAvatar = React.useCallback(async () => {
+    try {
+      const s = await AsyncStorage.getItem('auth:session');
+      if (!s) {
+        setAvatarUrl(null);
+        return;
+      }
+      const parsed = JSON.parse(s) as any;
+      const uid = parsed.uid as string | undefined;
+      if (uid) {
+        const snap = await getDoc(doc(db, 'users', uid));
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          setAvatarUrl(data.avatarUrl || null);
+          return;
+        }
+      }
+      setAvatarUrl(null);
+    } catch (e) {
+      setAvatarUrl(null);
+    }
+  }, []);
   
   // Format date as "Saturday, Oct 18"
   const formattedDate = currentDate.toLocaleDateString('en-US', {
@@ -92,6 +122,33 @@ export default function HomeScreen() {
   }, [isInitialLoad]);
 
   useEffect(() => {
+    // Keep header avatar in sync with AuthContext profile when it changes
+    (async () => {
+      try {
+        if (profile?.id) {
+          const snap = await getDoc(doc(db, 'users', profile.id));
+          if (snap.exists()) {
+            const data = snap.data() as any;
+            setAvatarUrl(data.avatarUrl || null);
+            return;
+          }
+        }
+        // fallback to reading session
+        await loadSessionAvatar();
+      } catch (e) {
+        setAvatarUrl(null);
+      }
+    })();
+  }, [profile?.id, loadSessionAvatar]);
+
+  // Also refresh when the screen gains focus (covers login/logout and switching accounts)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSessionAvatar();
+    }, [loadSessionAvatar])
+  );
+
+  useEffect(() => {
     // Load username from storage
     AsyncStorage.getItem('username').then((name) => {
       if (name) setUsername(name);
@@ -140,43 +197,26 @@ export default function HomeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.userContainer}>
-          <View style={styles.userAvatar}>
-            <Text style={styles.avatarText}>
-              {getFirstName().charAt(0)}
-            </Text>
-          </View>
-        </View>
+        <TouchableOpacity style={styles.userContainer} onPress={() => router.push('/profile' as any)}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.userAvatarImage} />
+          ) : profile?.name ? (
+            <View style={styles.userAvatar}>
+              <Text style={styles.avatarText}>{getFirstName().charAt(0)}</Text>
+            </View>
+          ) : (
+            <View style={styles.userAvatar}>
+              <Text style={styles.avatarText}>{getFirstName().charAt(0)}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>
             Hi, {getFirstName()}
           </Text>
           <Text style={styles.dateText}>{formattedDate}</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.signOutButton}
-          onPress={async () => {
-            Alert.alert(
-              'Sign Out',
-              'Are you sure you want to sign out?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Sign Out',
-                  style: 'destructive',
-                  onPress: async () => {
-                    await AsyncStorage.removeItem('username');
-                    await AsyncStorage.removeItem('auth:session');
-                    setUsername('Guest');
-                    router.push('/sign-in' as any);
-                  },
-                },
-              ]
-            );
-          }}
-        >
-          <Text style={styles.signOutIcon}>←</Text>
-        </TouchableOpacity>
+        {/* sign out moved to Profile screen; no header action here */}
       </View>
       
       {loading ? (
@@ -303,10 +343,7 @@ export default function HomeScreen() {
               id={item.id}
               name={item.name}
               type={item.type}
-              status={item.status}
-              hasMalfunction={item.hasMalfunction}
-              waitlistCount={item.waitlistCount || 0}
-              onWaitlistChange={loadEquipmentData}
+              status={item.status === 'broken' ? 'in_use' : item.status}
             />
           ))}
         </ScrollView>
@@ -340,6 +377,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#0a7ea4',
   },
+  userAvatarImage: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#0a7ea4' },
   avatarText: {
     fontSize: 22,
     color: 'white',
@@ -425,21 +463,29 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     width: '30%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    minHeight: 80,
   },
   actionIcon: {
-    fontSize: 28,
-    marginBottom: 8,
+    fontSize: 32,
+    marginBottom: 4,
+    textAlign: 'center',
+    lineHeight: 36,
+    width: '100%',
   },
   actionText: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
     color: '#11181C',
+    width: '100%',
+    lineHeight: 18,
+    fontWeight: '500',
   },
   activityCard: {
     backgroundColor: '#ffffff',

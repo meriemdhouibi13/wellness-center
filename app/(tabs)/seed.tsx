@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -192,7 +193,7 @@ export default function FriendsScreen() {
           <Text style={styles.emptyIcon}>👥</Text>
           <Text style={styles.emptyTitle}>Connect with Friends</Text>
           <Text style={styles.emptyText}>
-            Sign in to add friends and see their workout progress!
+            Log In to add friends and see their workout progress!
           </Text>
         </View>
       </View>
@@ -299,10 +300,12 @@ export default function FriendsScreen() {
               friends.map((friend) => (
                 <View key={friend.id} style={styles.friendCard}>
                   <View style={styles.friendAvatar}>
-                    <Text style={styles.friendAvatarText}>
-                      {friend.name.charAt(0)}
-                    </Text>
-                  </View>
+                      {friend.avatarUrl ? (
+                        <Image source={{ uri: friend.avatarUrl }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                      ) : (
+                        <Text style={styles.friendAvatarText}>{friend.name.charAt(0)}</Text>
+                      )}
+                    </View>
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{friend.name}</Text>
                     <Text style={styles.friendStats}>

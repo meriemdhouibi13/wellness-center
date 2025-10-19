@@ -71,8 +71,7 @@ export default function EquipmentTab() {
               id={item.id}
               name={item.name}
               type={item.type}
-              status={item.status}
-              hasMalfunction={item.hasMalfunction}
+              status={item.status === 'broken' ? 'in_use' : item.status}
             />
           ))}
         </ScrollView>

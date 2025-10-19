@@ -8,6 +8,10 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  
+  // For now we'll just show the admin tab to everyone for testing purposes
+  // In production you would implement proper role checking
+  const isAdmin = true;
 
   return (
     <Tabs
@@ -38,6 +42,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="classes"
+        options={{
+          title: 'Classes',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="equipment"
         options={{
           title: 'Equipment',
@@ -49,6 +60,16 @@ export default function TabLayout() {
         options={{
           title: 'Coach',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="figure.walk" color={color} />,
+        }}
+      />
+      
+      {/* Admin tab - will be visible for admin users */}
+      <Tabs.Screen
+        name="admin-seed"
+        options={{
+          title: 'Admin',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear" color={color} />,
+          href: isAdmin ? '/admin-seed' : null, // Only show tab if user is admin
         }}
       />
     </Tabs>

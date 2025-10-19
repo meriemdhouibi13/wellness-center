@@ -152,6 +152,7 @@ export async function respondToFriendRequest(
         friendId: currentUserId,
         friendName: toUserData.name,
         friendEmail: toUserData.email,
+        friendAvatarUrl: toUserData.avatarUrl || null,
         addedAt: Timestamp.now(),
       }),
       // Add to receiver's Friends
@@ -159,6 +160,7 @@ export async function respondToFriendRequest(
         friendId: fromUserId,
         friendName: fromUserData.name,
         friendEmail: fromUserData.email,
+        friendAvatarUrl: fromUserData.avatarUrl || null,
         addedAt: Timestamp.now(),
       }),
       // Delete the friend request
@@ -186,16 +188,29 @@ export async function getFriends(userId: string): Promise<Friend[]> {
   
   for (const friendDoc of snapshot.docs) {
     const friendData = friendDoc.data();
-    
+
     // Get additional stats from user's sessions
     const sessionsRef = collection(db, `users/${friendDoc.id}/sessions`);
     const sessionsSnapshot = await getDocs(sessionsRef);
-    
+
+    // Also fetch the friend's main user doc to read the current avatarUrl (authoritative)
+    let avatarUrl: string | null = null;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', friendDoc.id));
+      if (userDoc.exists()) {
+        const u = userDoc.data() as any;
+        avatarUrl = u.avatarUrl || null;
+      }
+    } catch (e) {
+      // ignore
+    }
+
     friends.push({
       id: friendDoc.id,
       name: friendData.friendName,
       email: friendData.friendEmail,
       totalSessions: sessionsSnapshot.size,
+      avatarUrl,
     });
   }
   

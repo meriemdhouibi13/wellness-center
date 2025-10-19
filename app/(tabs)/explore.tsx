@@ -93,7 +93,7 @@ export default function StatsScreen() {
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📊</Text>
           <Text style={styles.emptyTitle}>Track Your Progress</Text>
-          <Text style={styles.emptyText}>Sign in to view your personal statistics and workout history.</Text>
+          <Text style={styles.emptyText}>Log In to view your personal statistics and workout history.</Text>
         </View>
       </View>
     );

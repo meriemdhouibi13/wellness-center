@@ -6,6 +6,10 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
+  // Optional richer role detail chosen at sign-up and immutable afterwards
+  roleDetail?: 'community' | 'student' | 'athlete';
+  // Optional avatar URL stored in Firebase Storage
+  avatarUrl?: string;
   createdAt: number; // Date.now()
 }
 
@@ -75,6 +79,7 @@ export interface Friend {
   email: string;
   totalSessions?: number;
   currentStreak?: number;
+  avatarUrl?: string;
 }
 
 export interface FriendRequest {
@@ -122,4 +127,50 @@ export interface WaitlistEntry {
   notifiedAt: any | null; // Firestore Timestamp
   claimedAt: any | null; // Firestore Timestamp
   expiresAt: any | null; // Firestore Timestamp
+}
+
+// Classes feature types
+export type ClassCategory = 'yoga' | 'cardio' | 'strength' | 'hiit' | 'pilates' | 'dance' | 'meditation' | 'cycling' | 'other';
+
+export type ClassStatus = 'scheduled' | 'active' | 'completed' | 'canceled';
+
+export type ClassLevel = 'beginner' | 'intermediate' | 'advanced' | 'all-levels';
+
+export type RegistrationStatus = 'confirmed' | 'waitlisted' | 'canceled';
+
+export interface FitnessClass {
+  id: string;
+  title: string;
+  description: string;
+  category: ClassCategory;
+  level: ClassLevel;
+  instructorId: string;
+  instructorName: string;
+  location: string;
+  roomNumber?: string;
+  startTime: any; // Firestore Timestamp
+  endTime: any; // Firestore Timestamp
+  duration: number; // in minutes
+  capacity: number;
+  currentRegistrations: number;
+  waitlistEnabled: boolean;
+  waitlistCapacity: number;
+  status: ClassStatus;
+  imageUrl?: string;
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+}
+
+export interface ClassRegistration {
+  id: string;
+  classId: string;
+  userId: string;
+  userName: string;
+  registrationTime: any; // Firestore Timestamp
+  status: RegistrationStatus;
+  position?: number; // For waitlist
+  checkedIn: boolean;
+  checkinTime?: any; // Firestore Timestamp
+  notificationSent: boolean;
+  reminderSent: boolean;
 }

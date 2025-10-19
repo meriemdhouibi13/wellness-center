@@ -55,7 +55,7 @@ export default function EquipmentListScreen() {
               id={item.id}
               name={item.name}
               type={item.type}
-              status={item.status}
+              status={item.status === 'broken' ? 'in_use' : item.status}
             />
           ))}
         </ScrollView>

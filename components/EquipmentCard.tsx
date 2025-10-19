@@ -54,8 +54,13 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   useEffect(() => {
     if (status === 'in_use') {
       getEstimatedWaitTime(id)
-        .then(setEstimatedWaitTime)
-        .catch(console.error);
+        .then(time => {
+          console.log(`Estimated wait time for ${id}: ${time} minutes`);
+          setEstimatedWaitTime(time);
+        })
+        .catch(error => {
+          console.error(`Error getting wait time for ${id}:`, error);
+        });
     }
   }, [id, status]);
   
@@ -289,7 +294,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   icon: {
     fontSize: 32,

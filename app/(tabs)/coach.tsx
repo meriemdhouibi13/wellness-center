@@ -12,6 +12,10 @@ const MUSCLE_GROUPS = [
   'Core',
 ];
 
+/*
+  CoachTab is temporarily disabled because this Tab is being replaced.
+  Keeping the file here so it can be restored or used as reference.
+
 export default function CoachTab() {
   const router = useRouter();
 
@@ -38,6 +42,12 @@ export default function CoachTab() {
       </ScrollView>
     </View>
   );
+}
+*/
+
+// Temporary stub export to disable the tab while keeping this file in the repo.
+export default function CoachTabDisabled() {
+  return null;
 }
 
 const styles = StyleSheet.create({
