@@ -19,6 +19,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="scan" options={{ title: 'Scan QR Code' }} />
+        <Stack.Screen name="test-qr" options={{ presentation: 'modal', title: 'Test QR Generator' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

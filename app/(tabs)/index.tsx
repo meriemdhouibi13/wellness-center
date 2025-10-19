@@ -218,6 +218,14 @@ export default function HomeScreen() {
               <Text style={styles.actionIcon}>📊</Text>
               <Text style={styles.actionText}>My Stats</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#f0f0f0' }]}
+              onPress={() => router.push('/test-qr' as any)}
+            >
+              <Text style={styles.actionIcon}>🧪</Text>
+              <Text style={[styles.actionText, { fontSize: 11 }]}>Test QR</Text>
+            </TouchableOpacity>
           </View>
           
           {/* Current Activity */}
