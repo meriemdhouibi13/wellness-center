@@ -123,3 +123,49 @@ export interface WaitlistEntry {
   claimedAt: any | null; // Firestore Timestamp
   expiresAt: any | null; // Firestore Timestamp
 }
+
+// Classes feature types
+export type ClassCategory = 'yoga' | 'cardio' | 'strength' | 'hiit' | 'pilates' | 'dance' | 'meditation' | 'cycling' | 'other';
+
+export type ClassStatus = 'scheduled' | 'active' | 'completed' | 'canceled';
+
+export type ClassLevel = 'beginner' | 'intermediate' | 'advanced' | 'all-levels';
+
+export type RegistrationStatus = 'confirmed' | 'waitlisted' | 'canceled';
+
+export interface FitnessClass {
+  id: string;
+  title: string;
+  description: string;
+  category: ClassCategory;
+  level: ClassLevel;
+  instructorId: string;
+  instructorName: string;
+  location: string;
+  roomNumber?: string;
+  startTime: any; // Firestore Timestamp
+  endTime: any; // Firestore Timestamp
+  duration: number; // in minutes
+  capacity: number;
+  currentRegistrations: number;
+  waitlistEnabled: boolean;
+  waitlistCapacity: number;
+  status: ClassStatus;
+  imageUrl?: string;
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+}
+
+export interface ClassRegistration {
+  id: string;
+  classId: string;
+  userId: string;
+  userName: string;
+  registrationTime: any; // Firestore Timestamp
+  status: RegistrationStatus;
+  position?: number; // For waitlist
+  checkedIn: boolean;
+  checkinTime?: any; // Firestore Timestamp
+  notificationSent: boolean;
+  reminderSent: boolean;
+}

@@ -234,20 +234,11 @@ export async function claimFromWaitlist(equipmentId: string, userId: string): Pr
       throw new Error('You have not been notified yet');
     }
 
-    // Mark as claimed before removing (for analytics)
+    // Mark as claimed (keep for analytics, will be cleaned up later)
     await updateDoc(doc(db, WAITLIST_COLLECTION, entry.id), {
       status: 'claimed',
       claimedAt: Timestamp.now()
     });
-
-    // Remove from waitlist after a short delay to preserve analytics data
-    setTimeout(async () => {
-      try {
-        await deleteDoc(doc(db, WAITLIST_COLLECTION, entry.id));
-      } catch (error) {
-        console.error('Error cleaning up claimed waitlist entry:', error);
-      }
-    }, 1000);
 
     // Update equipment waitlist count
     const equipmentRef = doc(db, EQUIPMENT_COLLECTION, equipmentId);
@@ -345,16 +336,12 @@ export function subscribeToUserWaitlists(
  */
 export async function getEstimatedWaitTime(equipmentId: string): Promise<number | null> {
   try {
-    // Get completed waitlist entries for this equipment (last 30 days)
-    const thirtyDaysAgo = Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-    
+    // Get completed waitlist entries for this equipment
+    // Use only two where clauses to avoid composite index requirement
     const q = query(
       collection(db, WAITLIST_COLLECTION),
       where('equipmentId', '==', equipmentId),
-      where('status', '==', 'claimed'),
-      where('joinedAt', '>=', thirtyDaysAgo),
-      orderBy('joinedAt', 'desc'),
-      limit(50) // Last 50 completed waits
+      where('status', '==', 'claimed')
     );
     
     const snapshot = await getDocs(q);
@@ -363,11 +350,22 @@ export async function getEstimatedWaitTime(equipmentId: string): Promise<number 
       return null; // No historical data
     }
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    
+    // Filter by date in memory and sort by joinedAt descending
+    const recentDocs = snapshot.docs
+      .filter(doc => {
+        const data = doc.data();
+        return data.joinedAt && data.joinedAt.toDate() >= thirtyDaysAgo;
+      })
+      .sort((a, b) => b.data().joinedAt.toDate().getTime() - a.data().joinedAt.toDate().getTime())
+      .slice(0, 50); // Take most recent 50
+
     // Calculate average wait time in minutes
     let totalWaitTime = 0;
     let validEntries = 0;
     
-    snapshot.docs.forEach(doc => {
+    recentDocs.forEach(doc => {
       const data = doc.data();
       if (data.joinedAt && data.claimedAt) {
         const waitTimeMs = data.claimedAt.toDate().getTime() - data.joinedAt.toDate().getTime();
@@ -435,36 +433,49 @@ export async function getWaitlistAnalytics(equipmentId: string): Promise<{
 export async function cleanupExpiredWaitlistEntries(): Promise<void> {
   try {
     const now = Timestamp.now();
+    const thirtyDaysAgo = Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
     
-    // Find expired entries
-    const q = query(
+    // Find expired notified entries
+    const expiredQuery = query(
       collection(db, WAITLIST_COLLECTION),
       where('status', '==', 'notified'),
       where('expiresAt', '<', now)
     );
     
-    const snapshot = await getDocs(q);
+    // Find old claimed entries (older than 30 days)
+    const oldClaimedQuery = query(
+      collection(db, WAITLIST_COLLECTION),
+      where('status', '==', 'claimed'),
+      where('claimedAt', '<', thirtyDaysAgo)
+    );
     
-    if (snapshot.empty) {
+    const [expiredSnapshot, oldClaimedSnapshot] = await Promise.all([
+      getDocs(expiredQuery),
+      getDocs(oldClaimedQuery)
+    ]);
+    
+    const allDocsToDelete = [...expiredSnapshot.docs, ...oldClaimedSnapshot.docs];
+    
+    if (allDocsToDelete.length === 0) {
       return;
     }
     
-    // Mark as expired and remove
-    const updates = snapshot.docs.map(doc => 
+    // Mark expired entries as expired first
+    const expiredUpdates = expiredSnapshot.docs.map(doc => 
       updateDoc(doc.ref, { status: 'expired' })
     );
     
-    await Promise.all(updates);
+    await Promise.all(expiredUpdates);
     
-    // Remove after a delay to preserve analytics
+    // Remove all entries after a delay to preserve any last-minute analytics
     setTimeout(async () => {
       try {
-        const deletions = snapshot.docs.map(doc => deleteDoc(doc.ref));
+        const deletions = allDocsToDelete.map(doc => deleteDoc(doc.ref));
         await Promise.all(deletions);
         
-        // Update equipment waitlist counts
+        // Update equipment waitlist counts for expired entries only
         const equipmentUpdates = new Map<string, number>();
-        snapshot.docs.forEach(doc => {
+        expiredSnapshot.docs.forEach(doc => {
           const equipmentId = doc.data().equipmentId;
           equipmentUpdates.set(equipmentId, (equipmentUpdates.get(equipmentId) || 0) + 1);
         });
@@ -478,11 +489,11 @@ export async function cleanupExpiredWaitlistEntries(): Promise<void> {
         
         await Promise.all(equipmentUpdatePromises);
       } catch (error) {
-        console.error('Error cleaning up expired entries:', error);
+        console.error('Error cleaning up entries:', error);
       }
     }, 2000);
     
-    console.log(`Cleaned up ${snapshot.size} expired waitlist entries`);
+    console.log(`Cleaned up ${expiredSnapshot.size} expired and ${oldClaimedSnapshot.size} old claimed waitlist entries`);
   } catch (error) {
     console.error('Error cleaning up expired waitlist entries:', error);
   }
