@@ -46,6 +46,7 @@ export default function TabLayout() {
         options={{
           title: 'Classes',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
+          href: null, // classes tab removed — keep route disabled
         }}
       />
       <Tabs.Screen

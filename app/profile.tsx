@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [lastRoutine, setLastRoutine] = useState<string | null>(null);
+  const [lastClassViewed, setLastClassViewed] = useState<string | null>(null);
   const [roleDetail, setRoleDetail] = useState<'community' | 'student' | 'athlete'>('community');
 
   useEffect(() => {
@@ -45,6 +46,9 @@ export default function ProfileScreen() {
 
       const lr = await AsyncStorage.getItem('last:routineGroup');
       if (lr) setLastRoutine(lr);
+
+      const lc = await AsyncStorage.getItem('last:classViewed');
+      if (lc) setLastClassViewed(lc);
     })();
   }, []);
 
@@ -161,14 +165,7 @@ export default function ProfileScreen() {
         <Text style={{ fontSize: 16, fontWeight: '700', marginTop: 4 }}>{roleDetail === 'community' ? 'Community member' : roleDetail === 'student' ? 'Student' : 'Athlete'}</Text>
       </View>
 
-      {/*
-      {lastRoutine && (
-        <TouchableOpacity style={styles.routineCard} onPress={() => router.push(`/coach/${lastRoutine}` as any)}>
-          <Text style={styles.routineTitle}>Resume last routine</Text>
-          <Text style={styles.routineSubtitle}>{lastRoutine}</Text>
-        </TouchableOpacity>
-      )}
-      */}
+      {/* Classes feature removed — last viewed class link disabled */}
 
       <View style={styles.buttonRow}>
         <TouchableOpacity style={[styles.saveButton, styles.flexButton]} onPress={saveProfile} disabled={uploading}>

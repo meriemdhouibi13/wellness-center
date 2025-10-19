@@ -1,4 +1,4 @@
-// src/components/EquipmentCard.tsx
+﻿// src/components/EquipmentCard.tsx
 import { useAuth } from '@/contexts/AuthContext';
 import type { WaitlistEntry } from '@/services/types';
 import { getEstimatedWaitTime, getUserWaitlistEntry, joinWaitlist, leaveWaitlist } from '@/services/waitlist';
@@ -50,17 +50,27 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
     }
   }, [id, user?.uid, status]);
   
-  // Fetch estimated wait time
+  // Fetch estimated wait time and refresh every minute
   useEffect(() => {
     if (status === 'in_use') {
-      getEstimatedWaitTime(id)
-        .then(time => {
-          console.log(`Estimated wait time for ${id}: ${time} minutes`);
-          setEstimatedWaitTime(time);
-        })
-        .catch(error => {
-          console.error(`Error getting wait time for ${id}:`, error);
-        });
+      const fetchWaitTime = () => {
+        getEstimatedWaitTime(id)
+          .then(time => {
+            console.log(`Estimated wait time for ${id}: ${time} minutes`);
+            setEstimatedWaitTime(time);
+          })
+          .catch(error => {
+            console.error(`Error getting wait time for ${id}:`, error);
+          });
+      };
+      
+      // Initial fetch
+      fetchWaitTime();
+      
+      // Set up interval to refresh wait time
+      const interval = setInterval(fetchWaitTime, 60000); // Refresh every minute
+      
+      return () => clearInterval(interval);
     }
   }, [id, status]);
   
@@ -139,11 +149,8 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   
   // Handle card press
   const handlePress = () => {
-    if (status === 'available' && !hasMalfunction) {
-      // Navigate to equipment listing page
-      router.push('/equipment/index' as any);
-    }
-    // For in_use equipment, do nothing - let the waitlist buttons handle interactions
+    // Navigate to equipment detail page
+    router.push(`/equipment/${id}` as any);
   };
 
   return (
@@ -158,9 +165,8 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
     >
       <TouchableOpacity 
         style={styles.cardTouchable}
-        onPress={status === 'available' && !hasMalfunction ? handlePress : undefined}
-        disabled={status === 'broken' || status === 'in_use'}
-        activeOpacity={status === 'available' && !hasMalfunction ? 0.7 : 1}
+        onPress={handlePress}
+        activeOpacity={0.7}
       >
         <View style={styles.headerRow}>
           <Text style={styles.typeLabel}>{type.toUpperCase()}</Text>
@@ -193,11 +199,13 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
         )}
         
         {/* Estimated Wait Time */}
-        {status === 'in_use' && estimatedWaitTime && (
+        {status === 'in_use' && (
           <View style={styles.estimatedWaitTime}>
             <Text style={styles.estimatedWaitTimeIcon}>⏱️</Text>
             <Text style={styles.estimatedWaitTimeText}>
-              Est. wait: {estimatedWaitTime} min
+              {estimatedWaitTime 
+                ? `Est. wait: ${estimatedWaitTime} min` 
+                : 'Calculating wait time...'}
             </Text>
           </View>
         )}
@@ -294,16 +302,19 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 16,
   },
   icon: {
     fontSize: 32,
     marginVertical: 8,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   status: {
     fontWeight: 'bold',
     marginVertical: 8,
     fontSize: 14,
+    textAlign: 'center',
   },
   actionText: {
     fontSize: 13,

@@ -1,25 +1,17 @@
 // services/seed.ts
-import createSampleClasses from '@/scripts/seed-classes';
-
 /**
- * Seed classes for demo purposes
+ * Seed demo data placeholder
+ * Previously populated classes; classes feature removed — keep a safe placeholder
  */
-export async function seedClasses(): Promise<number> {
-  try {
-    await createSampleClasses();
-    return 15; // The number of classes we're creating in the sample
-  } catch (error) {
-    console.error('Error seeding classes:', error);
-    throw error;
-  }
+export async function seedDemoData(): Promise<number> {
+  console.log('seedDemoData called — classes feature removed.');
+  return 0;
 }
 
 /**
- * Clear demo data
+ * Clear demo data placeholder
  */
 export async function clearDemoData(): Promise<void> {
-  // This would typically connect to Firestore and delete sample data
-  // For now this is a placeholder
-  console.log('Clearing demo data...');
-  throw new Error('Not implemented yet');
+  console.log('Clearing demo data... (placeholder)');
+  return;
 }

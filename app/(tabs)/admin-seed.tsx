@@ -1,4 +1,4 @@
-import { clearDemoData, seedClasses } from '@/services/seed';
+import { clearDemoData, seedDemoData } from '@/services/seed';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
@@ -67,10 +67,11 @@ export default function AdminSeedScreen() {
         'Kickboxing', 'Barre Fitness', 'Gentle Yoga', 'CrossFit', 'Dance Cardio', 'Stretch & Recover'
       ];
       
-      const count = await seedClasses();
-      setResult(`Successfully generated ${count} sample classes!`);
-      setGeneratedClasses(sampleClassTitles);
-      setLastOperation('generate');
+  const count = await seedDemoData();
+  setResult(`Seed completed. (${count} items created)`);
+  // classes feature removed; show generated sample titles as informational only
+  setGeneratedClasses(sampleClassTitles);
+  setLastOperation('generate');
       
       // Animate the generated classes container
       Animated.timing(fadeAnim, {
@@ -79,10 +80,7 @@ export default function AdminSeedScreen() {
         useNativeDriver: true,
       }).start();
       
-      Alert.alert(
-        'Success', 
-        `Generated ${count} sample classes for the next 7 days. You can now view them in the Classes tab.`
-      );
+      Alert.alert('Success', `Seed completed. (${count} items created)`);
     } catch (error: any) {
       console.error('Error generating classes:', error);
       setResult(`Error: ${error.message}`);
@@ -239,15 +237,7 @@ export default function AdminSeedScreen() {
               </View>
             ))}
             
-            <TouchableOpacity
-              style={styles.viewClassesButton}
-              onPress={() => {
-                // Navigate directly to classes tab
-                router.navigate('/classes');
-              }}
-            >
-              <Text style={styles.viewClassesButtonText}>View in Classes Tab</Text>
-            </TouchableOpacity>
+            {/* Classes tab removed — navigation to Classes is disabled */}
           </Animated.View>
         )}
       </View>
