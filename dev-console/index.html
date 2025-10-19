@@ -278,6 +278,55 @@
         <button class="button danger" onclick="clearUserSessions()">🗑️ Clear User Sessions</button>
       </div>
 
+      <!-- Friends Management -->
+      <div class="card">
+        <h2><span class="card-icon">👥</span> Friends Management</h2>
+        <div class="input-group">
+          <label>User 1 Email (From)</label>
+          <input type="text" id="friendUser1Email" placeholder="john@example.com">
+        </div>
+        <div class="input-group">
+          <label>User 2 Email (To)</label>
+          <input type="text" id="friendUser2Email" placeholder="jane@example.com">
+        </div>
+        <button class="button" onclick="createFriendRequest()">➕ Create Friend Request</button>
+        <button class="button secondary" onclick="acceptAllPendingRequests()">✅ Accept All Pending (User 2)</button>
+        <button class="button" onclick="makeFriendsDirectly()">🤝 Make Friends Directly</button>
+        <button class="button danger" onclick="clearAllFriendData()">🗑️ Clear All Friend Data</button>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="card">
+        <h2><span class="card-icon">📱</span> Activity Feed</h2>
+        <div class="input-group">
+          <label>User ID</label>
+          <input type="text" id="activityUserId" placeholder="Firebase UID">
+        </div>
+        <div class="input-group">
+          <label>User Name</label>
+          <input type="text" id="activityUserName" placeholder="John Doe">
+        </div>
+        <div class="input-group">
+          <label>Activity Type</label>
+          <select id="activityType">
+            <option value="workout_completed">Workout Completed</option>
+            <option value="achievement_earned">Achievement Earned</option>
+            <option value="streak_milestone">Streak Milestone</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Description</label>
+          <input type="text" id="activityDescription" placeholder="Completed a 30-min cardio session">
+        </div>
+        <div class="input-group">
+          <label>Duration (minutes, optional)</label>
+          <input type="number" id="activityDuration" placeholder="30">
+        </div>
+        <button class="button" onclick="postActivity()">📢 Post Activity</button>
+        <button class="button secondary" onclick="generateSampleActivities()">🎲 Generate Sample Activities</button>
+        <button class="button danger" onclick="clearAllActivities()">🗑️ Clear All Activities</button>
+      </div>
+
       <!-- Quick Actions -->
       <div class="card">
         <h2><span class="card-icon">⚡</span> Quick Actions</h2>
@@ -782,6 +831,356 @@
         await updateStats();
       } catch (error) {
         log(`❌ Error clearing sessions: ${error.message}`, 'error');
+      }
+    };
+
+    // ========== FRIENDS MANAGEMENT ==========
+
+    // Helper function to get user by email
+    async function getUserByEmail(email) {
+      const { collection, query, where, getDocs } = window.firestoreModule;
+      const usersRef = collection(window.db, 'users');
+      const q = query(usersRef, where('email', '==', email.toLowerCase()));
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        return null;
+      }
+      
+      const userData = snapshot.docs[0].data();
+      return {
+        id: snapshot.docs[0].id,
+        name: userData.name,
+        email: userData.email,
+      };
+    }
+
+    // Create a friend request
+    window.createFriendRequest = async function() {
+      const user1Email = document.getElementById('friendUser1Email').value.trim();
+      const user2Email = document.getElementById('friendUser2Email').value.trim();
+
+      if (!user1Email || !user2Email) {
+        log('Please fill in both email addresses', 'error');
+        return;
+      }
+
+      try {
+        const { collection, doc, setDoc, getDoc, serverTimestamp } = window.firestoreModule;
+        
+        // Get both users from email
+        log('Looking up users...', 'info');
+        const [user1, user2] = await Promise.all([
+          getUserByEmail(user1Email),
+          getUserByEmail(user2Email)
+        ]);
+        
+        if (!user1) {
+          log(`❌ User not found: ${user1Email}`, 'error');
+          return;
+        }
+        
+        if (!user2) {
+          log(`❌ User not found: ${user2Email}`, 'error');
+          return;
+        }
+        
+        // Check if request already exists
+        const existingDoc = await getDoc(doc(window.db, `users/${user2.id}/FriendRequestsIncoming`, user1.id));
+        
+        if (existingDoc.exists()) {
+          log('⚠️ Friend request already exists', 'warning');
+          return;
+        }
+        
+        // Check if already friends
+        const friendDoc = await getDoc(doc(window.db, `users/${user1.id}/Friends`, user2.id));
+        if (friendDoc.exists()) {
+          log('⚠️ Already friends', 'warning');
+          return;
+        }
+
+        // Create friend request in user2's incoming requests
+        await setDoc(doc(window.db, `users/${user2.id}/FriendRequestsIncoming`, user1.id), {
+          fromUserId: user1.id,
+          fromUserName: user1.name,
+          fromUserEmail: user1.email,
+          sentAt: serverTimestamp(),
+        });
+
+        log(`✅ Friend request created from ${user1.name} to ${user2.name}`, 'success');
+      } catch (error) {
+        log(`❌ Error creating friend request: ${error.message}`, 'error');
+      }
+    };
+
+    // Accept all pending friend requests for User 2
+    window.acceptAllPendingRequests = async function() {
+      const user2Email = document.getElementById('friendUser2Email').value.trim();
+
+      if (!user2Email) {
+        log('Please enter User 2 email', 'error');
+        return;
+      }
+
+      try {
+        const { collection, getDocs, doc, setDoc, deleteDoc, getDoc, serverTimestamp } = window.firestoreModule;
+        
+        // Get user 2 from email
+        log('Looking up user...', 'info');
+        const user2 = await getUserByEmail(user2Email);
+        
+        if (!user2) {
+          log(`❌ User not found: ${user2Email}`, 'error');
+          return;
+        }
+        
+        // Get all pending requests for user2
+        const requestsRef = collection(window.db, `users/${user2.id}/FriendRequestsIncoming`);
+        const snapshot = await getDocs(requestsRef);
+
+        if (snapshot.empty) {
+          log('No pending friend requests found', 'warning');
+          return;
+        }
+
+        let acceptedCount = 0;
+
+        for (const requestDoc of snapshot.docs) {
+          const requestData = requestDoc.data();
+          const fromUserId = requestDoc.id;
+          
+          // Get both users' info
+          const fromUserDoc = await getDoc(doc(window.db, 'users', fromUserId));
+          
+          if (!fromUserDoc.exists()) continue;
+          
+          const fromUserData = fromUserDoc.data();
+          
+          // Add to both users' Friends collections
+          await Promise.all([
+            setDoc(doc(window.db, `users/${fromUserId}/Friends`, user2.id), {
+              friendId: user2.id,
+              friendName: user2.name,
+              friendEmail: user2.email,
+              addedAt: serverTimestamp(),
+            }),
+            setDoc(doc(window.db, `users/${user2.id}/Friends`, fromUserId), {
+              friendId: fromUserId,
+              friendName: fromUserData.name,
+              friendEmail: fromUserData.email,
+              addedAt: serverTimestamp(),
+            }),
+            // Delete the friend request
+            deleteDoc(doc(window.db, `users/${user2.id}/FriendRequestsIncoming`, fromUserId)),
+          ]);
+
+          acceptedCount++;
+        }
+
+        log(`✅ Accepted ${acceptedCount} friend request(s)`, 'success');
+      } catch (error) {
+        log(`❌ Error accepting friend requests: ${error.message}`, 'error');
+      }
+    };
+
+    // Make two users friends directly (skip request)
+    window.makeFriendsDirectly = async function() {
+      const user1Email = document.getElementById('friendUser1Email').value.trim();
+      const user2Email = document.getElementById('friendUser2Email').value.trim();
+
+      if (!user1Email || !user2Email) {
+        log('Please fill in both email addresses', 'error');
+        return;
+      }
+
+      try {
+        const { doc, setDoc, serverTimestamp } = window.firestoreModule;
+        
+        // Get both users from email
+        log('Looking up users...', 'info');
+        const [user1, user2] = await Promise.all([
+          getUserByEmail(user1Email),
+          getUserByEmail(user2Email)
+        ]);
+        
+        if (!user1) {
+          log(`❌ User not found: ${user1Email}`, 'error');
+          return;
+        }
+        
+        if (!user2) {
+          log(`❌ User not found: ${user2Email}`, 'error');
+          return;
+        }
+        
+        // Add to both users' Friends collections
+        await Promise.all([
+          setDoc(doc(window.db, `users/${user1.id}/Friends`, user2.id), {
+            friendId: user2.id,
+            friendName: user2.name,
+            friendEmail: user2.email,
+            addedAt: serverTimestamp(),
+          }),
+          setDoc(doc(window.db, `users/${user2.id}/Friends`, user1.id), {
+            friendId: user1.id,
+            friendName: user1.name,
+            friendEmail: user1.email,
+            addedAt: serverTimestamp(),
+          }),
+        ]);
+
+        log(`✅ ${user1.name} and ${user2.name} are now friends!`, 'success');
+      } catch (error) {
+        log(`❌ Error making friends: ${error.message}`, 'error');
+      }
+    };
+
+    // Clear all friend data
+    window.clearAllFriendData = async function() {
+      if (!confirm('Are you sure you want to delete ALL friend requests and friendships? This cannot be undone!')) {
+        return;
+      }
+
+      try {
+        const { collection, getDocs, deleteDoc, doc } = window.firestoreModule;
+        
+        const deletePromises = [];
+        
+        // Clear all users' Friends and FriendRequestsIncoming
+        const usersRef = collection(window.db, 'users');
+        const usersSnapshot = await getDocs(usersRef);
+        
+        for (const userDoc of usersSnapshot.docs) {
+          // Clear Friends
+          const friendsRef = collection(window.db, `users/${userDoc.id}/Friends`);
+          const friendsSnapshot = await getDocs(friendsRef);
+          
+          friendsSnapshot.forEach(friendDoc => {
+            deletePromises.push(deleteDoc(doc(window.db, `users/${userDoc.id}/Friends`, friendDoc.id)));
+          });
+          
+          // Clear FriendRequestsIncoming
+          const requestsRef = collection(window.db, `users/${userDoc.id}/FriendRequestsIncoming`);
+          const requestsSnapshot = await getDocs(requestsRef);
+          
+          requestsSnapshot.forEach(requestDoc => {
+            deletePromises.push(deleteDoc(doc(window.db, `users/${userDoc.id}/FriendRequestsIncoming`, requestDoc.id)));
+          });
+        }
+
+        await Promise.all(deletePromises);
+        
+        log(`✅ Cleared all friend data (${deletePromises.length} documents)`, 'success');
+      } catch (error) {
+        log(`❌ Error clearing friend data: ${error.message}`, 'error');
+      }
+    };
+
+    // ========== ACTIVITY FEED ==========
+
+    // Post an activity
+    window.postActivity = async function() {
+      const userId = document.getElementById('activityUserId').value;
+      const userName = document.getElementById('activityUserName').value;
+      const type = document.getElementById('activityType').value;
+      const description = document.getElementById('activityDescription').value;
+      const duration = parseInt(document.getElementById('activityDuration').value) || null;
+
+      if (!userId || !userName || !description) {
+        log('Please fill in User ID, Name, and Description', 'error');
+        return;
+      }
+
+      try {
+        const { collection, addDoc, serverTimestamp } = window.firestoreModule;
+        const activitiesRef = collection(window.db, 'activities');
+
+        const activityData = {
+          userId,
+          userName,
+          type,
+          description,
+          createdAt: serverTimestamp(),
+        };
+
+        if (duration) {
+          activityData.duration = duration;
+        }
+
+        await addDoc(activitiesRef, activityData);
+        
+        log(`✅ Activity posted: ${description}`, 'success');
+      } catch (error) {
+        log(`❌ Error posting activity: ${error.message}`, 'error');
+      }
+    };
+
+    // Generate sample activities
+    window.generateSampleActivities = async function() {
+      const userId = document.getElementById('activityUserId').value;
+      const userName = document.getElementById('activityUserName').value;
+
+      if (!userId || !userName) {
+        log('Please enter User ID and Name first', 'error');
+        return;
+      }
+
+      const sampleActivities = [
+        { type: 'workout_completed', description: `${userName} completed a 30-min cardio session`, duration: 30 },
+        { type: 'workout_completed', description: `${userName} finished strength training`, duration: 45 },
+        { type: 'achievement_earned', description: `${userName} earned the "Early Bird" badge!` },
+        { type: 'streak_milestone', description: `${userName} reached a 7-day workout streak! 🔥` },
+        { type: 'workout_completed', description: `${userName} did a yoga session`, duration: 20 },
+      ];
+
+      try {
+        const { collection, addDoc, serverTimestamp } = window.firestoreModule;
+        const activitiesRef = collection(window.db, 'activities');
+
+        for (const activity of sampleActivities) {
+          const activityData = {
+            userId,
+            userName,
+            type: activity.type,
+            description: activity.description,
+            createdAt: serverTimestamp(),
+          };
+
+          if (activity.duration) {
+            activityData.duration = activity.duration;
+          }
+
+          await addDoc(activitiesRef, activityData);
+        }
+
+        log(`✅ Generated ${sampleActivities.length} sample activities`, 'success');
+      } catch (error) {
+        log(`❌ Error generating activities: ${error.message}`, 'error');
+      }
+    };
+
+    // Clear all activities
+    window.clearAllActivities = async function() {
+      if (!confirm('Are you sure you want to delete ALL activities? This cannot be undone!')) {
+        return;
+      }
+
+      try {
+        const { collection, getDocs, deleteDoc, doc } = window.firestoreModule;
+        const activitiesRef = collection(window.db, 'activities');
+        const snapshot = await getDocs(activitiesRef);
+
+        const deletePromises = [];
+        snapshot.forEach(docSnapshot => {
+          deletePromises.push(deleteDoc(doc(window.db, 'activities', docSnapshot.id)));
+        });
+
+        await Promise.all(deletePromises);
+        
+        log(`✅ Cleared ${snapshot.size} activities`, 'success');
+      } catch (error) {
+        log(`❌ Error clearing activities: ${error.message}`, 'error');
       }
     };
 
