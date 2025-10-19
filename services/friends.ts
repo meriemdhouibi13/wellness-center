@@ -14,9 +14,20 @@ import {
   limit as firestoreLimit,
   Timestamp,
   onSnapshot,
+  increment as firestoreInc,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Friend, FriendRequest, Activity, LeaderboardEntry } from './types';
+import type { 
+  Friend, 
+  FriendRequest, 
+  Activity, 
+  LeaderboardEntry, 
+  WorkoutTemplate,
+  ProgressUpdate,
+  ProgressComment 
+} from './types';
 
 /**
  * Search for a user by email address
@@ -371,4 +382,376 @@ export async function getWeeklyLeaderboard(userId: string): Promise<LeaderboardE
   });
   
   return leaderboard;
+}
+
+/**
+ * Workout Template Functions
+ */
+
+/**
+ * Create a new workout template
+ */
+export async function createWorkoutTemplate(
+  userId: string,
+  userName: string,
+  templateData: Omit<WorkoutTemplate, 'id' | 'userId' | 'userName' | 'createdAt' | 'likes' | 'usageCount'>
+): Promise<string> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const templatesRef = collection(db, 'workoutTemplates');
+  
+  const newTemplate: Omit<WorkoutTemplate, 'id'> = {
+    ...templateData,
+    userId,
+    userName,
+    createdAt: Timestamp.now(),
+    likes: 0,
+    usageCount: 0
+  };
+  
+  const docRef = await addDoc(templatesRef, newTemplate);
+  return docRef.id;
+}
+
+/**
+ * Get workout templates created by a specific user
+ */
+export async function getUserWorkoutTemplates(userId: string): Promise<WorkoutTemplate[]> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const templatesRef = collection(db, 'workoutTemplates');
+  const q = query(
+    templatesRef,
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as WorkoutTemplate[];
+}
+
+/**
+ * Get workout templates shared by friends
+ */
+export async function getFriendsWorkoutTemplates(userId: string): Promise<WorkoutTemplate[]> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  // First, get the user's friends
+  const friendsIds = await getFriendIds(userId);
+  
+  if (friendsIds.length === 0) {
+    return [];
+  }
+  
+  // Get templates from friends that are public
+  const templatesRef = collection(db, 'workoutTemplates');
+  const q = query(
+    templatesRef,
+    where('userId', 'in', friendsIds),
+    where('isPublic', '==', true),
+    orderBy('createdAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as WorkoutTemplate[];
+}
+
+/**
+ * Get a single workout template by ID
+ */
+export async function getWorkoutTemplate(templateId: string): Promise<WorkoutTemplate | null> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const templateRef = doc(db, 'workoutTemplates', templateId);
+  const templateDoc = await getDoc(templateRef);
+  
+  if (!templateDoc.exists()) {
+    return null;
+  }
+  
+  return {
+    id: templateDoc.id,
+    ...templateDoc.data()
+  } as WorkoutTemplate;
+}
+
+/**
+ * Update an existing workout template
+ */
+export async function updateWorkoutTemplate(
+  templateId: string,
+  userId: string,
+  updates: Partial<Omit<WorkoutTemplate, 'id' | 'userId' | 'createdAt' | 'likes' | 'usageCount'>>
+): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  // Verify the user owns this template
+  const templateRef = doc(db, 'workoutTemplates', templateId);
+  const templateDoc = await getDoc(templateRef);
+  
+  if (!templateDoc.exists()) {
+    throw new Error('Template not found');
+  }
+  
+  if (templateDoc.data().userId !== userId) {
+    throw new Error('You can only update your own templates');
+  }
+  
+  await updateDoc(templateRef, updates);
+}
+
+/**
+ * Delete a workout template
+ */
+export async function deleteWorkoutTemplate(templateId: string, userId: string): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  // Verify the user owns this template
+  const templateRef = doc(db, 'workoutTemplates', templateId);
+  const templateDoc = await getDoc(templateRef);
+  
+  if (!templateDoc.exists()) {
+    throw new Error('Template not found');
+  }
+  
+  if (templateDoc.data().userId !== userId) {
+    throw new Error('You can only delete your own templates');
+  }
+  
+  await deleteDoc(templateRef);
+}
+
+/**
+ * Like a workout template
+ */
+export async function likeWorkoutTemplate(templateId: string): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const templateRef = doc(db, 'workoutTemplates', templateId);
+  await updateDoc(templateRef, {
+    likes: firestoreInc(1)
+  });
+}
+
+/**
+ * Track usage of a workout template
+ */
+export async function incrementTemplateUsage(templateId: string): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const templateRef = doc(db, 'workoutTemplates', templateId);
+  await updateDoc(templateRef, {
+    usageCount: firestoreInc(1)
+  });
+}
+
+// Helper function to get just the friend IDs
+async function getFriendIds(userId: string): Promise<string[]> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const friendsRef = collection(db, `users/${userId}/Friends`);
+  const snapshot = await getDocs(friendsRef);
+  
+  return snapshot.docs.map(doc => doc.id);
+}
+
+/**
+ * Progress Sharing Functions
+ */
+
+/**
+ * Create a new progress update
+ */
+export async function createProgressUpdate(
+  userId: string,
+  userName: string,
+  updateData: Omit<ProgressUpdate, 'id' | 'userId' | 'userName' | 'createdAt' | 'likes' | 'comments'>
+): Promise<string> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const progressRef = collection(db, 'progressUpdates');
+  
+  const newProgressUpdate: Omit<ProgressUpdate, 'id'> = {
+    ...updateData,
+    userId,
+    userName,
+    createdAt: Timestamp.now(),
+    likes: [],
+    comments: []
+  };
+  
+  const docRef = await addDoc(progressRef, newProgressUpdate);
+  
+  // Add to activity feed
+  await addToActivityFeed(userId, userName, 'achievement', updateData.title, undefined, undefined, updateData.type);
+  
+  return docRef.id;
+}
+
+/**
+ * Get progress updates by a specific user
+ */
+export async function getUserProgressUpdates(userId: string): Promise<ProgressUpdate[]> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const progressRef = collection(db, 'progressUpdates');
+  const q = query(
+    progressRef,
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as ProgressUpdate[];
+}
+
+/**
+ * Get progress updates from friends
+ */
+export async function getFriendsProgressUpdates(userId: string, limit: number = 10): Promise<ProgressUpdate[]> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  // First, get the user's friends
+  const friendsIds = await getFriendIds(userId);
+  
+  if (friendsIds.length === 0) {
+    return [];
+  }
+  
+  // Get progress updates from friends that are public
+  const progressRef = collection(db, 'progressUpdates');
+  const q = query(
+    progressRef,
+    where('userId', 'in', friendsIds),
+    where('isPublic', '==', true),
+    orderBy('createdAt', 'desc'),
+    firestoreLimit(limit)
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as ProgressUpdate[];
+}
+
+/**
+ * Get a single progress update by ID
+ */
+export async function getProgressUpdate(updateId: string): Promise<ProgressUpdate | null> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const updateRef = doc(db, 'progressUpdates', updateId);
+  const updateDoc = await getDoc(updateRef);
+  
+  if (!updateDoc.exists()) {
+    return null;
+  }
+  
+  return {
+    id: updateDoc.id,
+    ...updateDoc.data()
+  } as ProgressUpdate;
+}
+
+/**
+ * Like or unlike a progress update
+ */
+export async function toggleLikeProgressUpdate(updateId: string, userId: string): Promise<boolean> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const updateRef = doc(db, 'progressUpdates', updateId);
+  const updateDoc = await getDoc(updateRef);
+  
+  if (!updateDoc.exists()) {
+    throw new Error('Progress update not found');
+  }
+  
+  const updateData = updateDoc.data() as ProgressUpdate;
+  const hasLiked = updateData.likes.includes(userId);
+  
+  await updateDoc(updateRef, {
+    likes: hasLiked 
+      ? arrayRemove(userId) 
+      : arrayUnion(userId)
+  });
+  
+  return !hasLiked; // Return true if now liked, false if now unliked
+}
+
+/**
+ * Add a comment to a progress update
+ */
+export async function addCommentToProgressUpdate(
+  updateId: string,
+  userId: string,
+  userName: string,
+  content: string
+): Promise<string> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const updateRef = doc(db, 'progressUpdates', updateId);
+  const updateDoc = await getDoc(updateRef);
+  
+  if (!updateDoc.exists()) {
+    throw new Error('Progress update not found');
+  }
+  
+  const commentId = `comment_${Date.now()}`;
+  const newComment: ProgressComment = {
+    id: commentId,
+    userId,
+    userName,
+    content,
+    createdAt: Timestamp.now()
+  };
+  
+  await updateDoc(updateRef, {
+    comments: arrayUnion(newComment)
+  });
+  
+  return commentId;
+}
+
+/**
+ * Delete a comment from a progress update
+ */
+export async function deleteCommentFromProgressUpdate(
+  updateId: string,
+  commentId: string,
+  userId: string
+): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  
+  const updateRef = doc(db, 'progressUpdates', updateId);
+  const updateDoc = await getDoc(updateRef);
+  
+  if (!updateDoc.exists()) {
+    throw new Error('Progress update not found');
+  }
+  
+  const updateData = updateDoc.data() as ProgressUpdate;
+  const commentToDelete = updateData.comments.find(comment => comment.id === commentId);
+  
+  if (!commentToDelete) {
+    throw new Error('Comment not found');
+  }
+  
+  // Ensure the user is the comment author
+  if (commentToDelete.userId !== userId) {
+    throw new Error('You can only delete your own comments');
+  }
+  
+  await updateDoc(updateRef, {
+    comments: arrayRemove(commentToDelete)
+  });
 }

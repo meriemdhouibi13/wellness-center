@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   increment,
   limit,
@@ -15,6 +16,8 @@ import {
   updateDoc,
   where
 } from 'firebase/firestore';
+import * as Notifications from 'expo-notifications';
+import { logEquipmentUsageStart } from './equipment';
 import type { WaitlistEntry, WaitlistStatus } from './types';
 
 const WAITLIST_COLLECTION = 'waitlist';
@@ -166,7 +169,7 @@ export async function getEquipmentWaitlist(equipmentId: string): Promise<Waitlis
 /**
  * Notify the next person in the waitlist when equipment becomes available
  */
-export async function notifyNextInWaitlist(equipmentId: string): Promise<void> {
+export async function notifyNextInWaitlist(equipmentId: string, equipmentName?: string): Promise<void> {
   try {
     // Get the first person in the waitlist
     const q = query(
@@ -184,6 +187,7 @@ export async function notifyNextInWaitlist(equipmentId: string): Promise<void> {
     }
 
     const firstInLine = snapshot.docs[0];
+    const waitlistData = firstInLine.data();
     
     // Update their status to notified
     await updateDoc(firstInLine.ref, {
@@ -193,9 +197,25 @@ export async function notifyNextInWaitlist(equipmentId: string): Promise<void> {
       expiresAt: Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)) // 5 minutes to claim
     });
 
-    // TODO: Send push notification to user
-    // This would require expo-notifications and storing user notification tokens
-    console.log(`Notified user ${firstInLine.data().userName} that equipment ${equipmentId} is available`);
+    // Send push notification to user
+    const eqName = equipmentName || 'Equipment';
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${eqName} Available Now!`,
+        body: `The ${eqName} you were waiting for is now available. You have 5 minutes to claim it.`,
+        data: {
+          type: 'equipment_available',
+          equipmentId,
+          waitlistEntryId: firstInLine.id,
+          expiresAt: Date.now() + 5 * 60 * 1000
+        },
+        sound: true,
+        categoryIdentifier: 'equipment_available'
+      },
+      trigger: null, // Send immediately
+    });
+    
+    console.log(`Notified user ${waitlistData.userName} that equipment ${equipmentId} is available`);
     
     // For now, send a local notification (user would need to be in the app)
     // In a real app, you'd send a push notification to the user's device
@@ -336,8 +356,40 @@ export function subscribeToUserWaitlists(
  */
 export async function getEstimatedWaitTime(equipmentId: string): Promise<number | null> {
   try {
-    // Get completed waitlist entries for this equipment
-    // Use only two where clauses to avoid composite index requirement
+    // First check if there's an active usage
+    const usageQuery = query(
+      collection(db, `${EQUIPMENT_COLLECTION}/${equipmentId}/usage`),
+      where('endTime', '==', null),
+      limit(1)
+    );
+    
+    const usageSnapshot = await getDocs(usageQuery);
+    
+    // If there's active usage, calculate from current usage pattern
+    if (!usageSnapshot.empty) {
+      const activeUsage = usageSnapshot.docs[0].data();
+      const startTime = activeUsage.startTime;
+      
+      // Get average usage duration for this equipment
+      const avgDuration = await getAverageUsageDuration(equipmentId);
+      
+      if (avgDuration) {
+        // Calculate how long it's been used so far
+        const elapsedMinutes = (Date.now() - startTime) / (1000 * 60);
+        
+        // Estimate remaining time
+        const estimatedRemaining = Math.max(1, Math.round(avgDuration - elapsedMinutes));
+        
+        // Get waitlist position to determine total wait
+        const waitlist = await getEquipmentWaitlist(equipmentId);
+        const waitlistPosition = waitlist.length;
+        
+        // Add estimated time for each person ahead in line
+        return estimatedRemaining + (waitlistPosition * avgDuration);
+      }
+    }
+    
+    // Fallback to historical wait time calculation
     const q = query(
       collection(db, WAITLIST_COLLECTION),
       where('equipmentId', '==', equipmentId),
@@ -347,7 +399,7 @@ export async function getEstimatedWaitTime(equipmentId: string): Promise<number 
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) {
-      return null; // No historical data
+      return 15; // Default estimate if no historical data
     }
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -376,13 +428,59 @@ export async function getEstimatedWaitTime(equipmentId: string): Promise<number 
     });
     
     if (validEntries === 0) {
-      return null;
+      return 15; // Default estimate if no valid entries
     }
     
     const averageWaitTime = totalWaitTime / validEntries;
     return Math.round(averageWaitTime);
   } catch (error) {
     console.error('Error calculating estimated wait time:', error);
+    return 15; // Default estimate on error
+  }
+}
+
+/**
+ * Get average usage duration for equipment
+ */
+async function getAverageUsageDuration(equipmentId: string): Promise<number | null> {
+  try {
+    const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    
+    const usageQuery = query(
+      collection(db, `${EQUIPMENT_COLLECTION}/${equipmentId}/usage`),
+      where('endTime', '!=', null),
+      where('startTime', '>=', twoWeeksAgo),
+      limit(50)
+    );
+    
+    const usageSnapshot = await getDocs(usageQuery);
+    
+    if (usageSnapshot.empty) {
+      return null;
+    }
+    
+    let totalDuration = 0;
+    let count = 0;
+    
+    usageSnapshot.docs.forEach(doc => {
+      const usage = doc.data();
+      if (usage.durationMinutes) {
+        totalDuration += usage.durationMinutes;
+        count++;
+      } else if (usage.startTime && usage.endTime) {
+        const duration = (usage.endTime - usage.startTime) / (1000 * 60);
+        totalDuration += duration;
+        count++;
+      }
+    });
+    
+    if (count === 0) {
+      return null;
+    }
+    
+    return Math.round(totalDuration / count);
+  } catch (error) {
+    console.error('Error calculating average usage duration:', error);
     return null;
   }
 }
@@ -430,6 +528,74 @@ export async function getWaitlistAnalytics(equipmentId: string): Promise<{
 /**
  * Clean up expired waitlist entries (call this periodically)
  */
+/**
+ * Mark equipment as available and notify next person in waitlist
+ */
+export async function markEquipmentAvailable(equipmentId: string, equipmentName: string): Promise<void> {
+  try {
+    // Update equipment status
+    const equipmentRef = doc(db, EQUIPMENT_COLLECTION, equipmentId);
+    await updateDoc(equipmentRef, {
+      status: 'available',
+      updatedAt: Date.now()
+    });
+    
+    // Notify next person in waitlist
+    await notifyNextInWaitlist(equipmentId, equipmentName);
+  } catch (error) {
+    console.error('Error marking equipment as available:', error);
+  }
+}
+
+/**
+ * Claim equipment from waitlist
+ */
+export async function claimWaitlistedEquipment(
+  equipmentId: string,
+  waitlistEntryId: string,
+  userId: string
+): Promise<boolean> {
+  try {
+    // Get waitlist entry and verify it's for this user and not expired
+    const entryRef = doc(db, WAITLIST_COLLECTION, waitlistEntryId);
+    const entrySnap = await getDoc(entryRef);
+    
+    if (!entrySnap.exists()) {
+      return false;
+    }
+    
+    const entryData = entrySnap.data() as WaitlistEntry;
+    
+    // Check if entry is valid for claiming
+    if (entryData.userId !== userId || 
+        entryData.status !== 'notified' ||
+        (entryData.expiresAt && entryData.expiresAt.toDate() < new Date())) {
+      return false;
+    }
+    
+    // Mark as claimed
+    await updateDoc(entryRef, {
+      status: 'claimed',
+      claimedAt: Timestamp.now()
+    });
+    
+    // Update equipment status to in_use
+    const equipmentRef = doc(db, EQUIPMENT_COLLECTION, equipmentId);
+    await updateDoc(equipmentRef, {
+      status: 'in_use',
+      updatedAt: Date.now()
+    });
+    
+    // Log equipment usage start
+    await logEquipmentUsageStart(equipmentId, userId);
+    
+    return true;
+  } catch (error) {
+    console.error('Error claiming waitlisted equipment:', error);
+    return false;
+  }
+}
+
 export async function cleanupExpiredWaitlistEntries(): Promise<void> {
   try {
     const now = Timestamp.now();
