@@ -27,7 +27,16 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   onWaitlistChange,
 }) => {
   const router = useRouter();
-  const { user } = useAuth();
+  
+  // Try to get user, but don't fail if AuthProvider isn't available
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch {
+    // Auth not available, user features will be disabled
+  }
+  
   const [myWaitlistEntry, setMyWaitlistEntry] = useState<WaitlistEntry | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
