@@ -7,18 +7,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Conditionally import BarCodeScanner only on native platforms
-let BarCodeScanner: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const BarcodeScanner = require('expo-barcode-scanner');
-    BarCodeScanner = BarcodeScanner.BarCodeScanner;
-  } catch (error) {
-    console.warn('BarCodeScanner not available:', error);
-  }
-}
+import { BarCodeScanner } from 'expo-barcode-scanner';
 
 export default function ScanScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -30,8 +19,7 @@ export default function ScanScreen() {
 
   // Request camera permissions when component mounts
   useEffect(() => {
-    // Only request permissions on native platforms
-    if (Platform.OS !== 'web' && BarCodeScanner) {
+    if (Platform.OS !== 'web') {
       const getBarCodeScannerPermissions = async () => {
         try {
           const { status } = await BarCodeScanner.requestPermissionsAsync();
@@ -43,12 +31,8 @@ export default function ScanScreen() {
         }
       };
       getBarCodeScannerPermissions();
-    } else if (Platform.OS === 'web' || !BarCodeScanner) {
-      // On web or if BarCodeScanner is not available, set hasPermission to false
+    } else {
       setHasPermission(false);
-      if (!BarCodeScanner && Platform.OS !== 'web') {
-        setError('Camera scanner is not available. Please ensure you are running on a physical device or properly configured emulator.');
-      }
     }
   }, []);
 
@@ -247,16 +231,10 @@ export default function ScanScreen() {
       </View>
 
       <View style={styles.scannerContainer}>
-        {BarCodeScanner ? (
-          <BarCodeScanner
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-            style={styles.scanner}
-          />
-        ) : (
-          <View style={[styles.scanner, {justifyContent: 'center', alignItems: 'center', backgroundColor: '#000'}]}>
-            <Text style={{color: '#fff'}}>Camera not available</Text>
-          </View>
-        )}
+        <BarCodeScanner
+          onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+          style={styles.scanner}
+        />
         
         <View style={styles.overlay}>
           <View style={styles.overlayBox}>
