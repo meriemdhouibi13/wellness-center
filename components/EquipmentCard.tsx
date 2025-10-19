@@ -1,7 +1,7 @@
 // src/components/EquipmentCard.tsx
 import { useAuth } from '@/contexts/AuthContext';
 import type { WaitlistEntry } from '@/services/types';
-import { getUserWaitlistEntry, joinWaitlist, leaveWaitlist } from '@/services/waitlist';
+import { getEstimatedWaitTime, getUserWaitlistEntry, joinWaitlist, leaveWaitlist } from '@/services/waitlist';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -39,6 +39,7 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
   
   const [myWaitlistEntry, setMyWaitlistEntry] = useState<WaitlistEntry | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [estimatedWaitTime, setEstimatedWaitTime] = useState<number | null>(null);
   
   // Check if user is on waitlist for this equipment
   useEffect(() => {
@@ -48,6 +49,15 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
         .catch(console.error);
     }
   }, [id, user?.uid, status]);
+  
+  // Fetch estimated wait time
+  useEffect(() => {
+    if (status === 'in_use') {
+      getEstimatedWaitTime(id)
+        .then(setEstimatedWaitTime)
+        .catch(console.error);
+    }
+  }, [id, status]);
   
   // Get the appropriate icon based on equipment type
   const getEquipmentIcon = () => {
@@ -128,10 +138,11 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
       // Navigate to equipment listing page
       router.push('/equipment/index' as any);
     }
+    // For in_use equipment, do nothing - let the waitlist buttons handle interactions
   };
 
   return (
-    <TouchableOpacity 
+    <View 
       style={[
         styles.card,
         { 
@@ -139,50 +150,64 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
           opacity: status === 'broken' ? 0.5 : 1
         }
       ]}
-      onPress={handlePress}
-      disabled={status === 'broken'}
-      activeOpacity={0.7}
     >
-      <View style={styles.headerRow}>
-        <Text style={styles.typeLabel}>{type.toUpperCase()}</Text>
-        {hasMalfunction && status !== 'broken' && (
-          <View style={styles.malfunctionBadge}>
-            <Text style={styles.malfunctionIcon}>ℹ️</Text>
-            <Text style={styles.malfunctionText}>Reported as malfunctioning</Text>
+      <TouchableOpacity 
+        style={styles.cardTouchable}
+        onPress={status === 'available' && !hasMalfunction ? handlePress : undefined}
+        disabled={status === 'broken' || status === 'in_use'}
+        activeOpacity={status === 'available' && !hasMalfunction ? 0.7 : 1}
+      >
+        <View style={styles.headerRow}>
+          <Text style={styles.typeLabel}>{type.toUpperCase()}</Text>
+          {hasMalfunction && status !== 'broken' && (
+            <View style={styles.malfunctionBadge}>
+              <Text style={styles.malfunctionIcon}>ℹ️</Text>
+              <Text style={styles.malfunctionText}>Reported as malfunctioning</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.name}>{name}</Text>
+        
+        <Text style={styles.icon}>{getEquipmentIcon()}</Text>
+        
+        <Text style={[
+          styles.status,
+          { color: getStatusColor() }
+        ]}>
+          {getStatusText()}
+        </Text>
+        
+        {/* Waitlist Info */}
+        {status === 'in_use' && waitlistCount > 0 && (
+          <View style={styles.waitlistInfo}>
+            <Text style={styles.waitlistIcon}>👥</Text>
+            <Text style={styles.waitlistText}>
+              {waitlistCount} {waitlistCount === 1 ? 'person' : 'people'} waiting
+            </Text>
           </View>
         )}
-      </View>
-      <Text style={styles.name}>{name}</Text>
+        
+        {/* Estimated Wait Time */}
+        {status === 'in_use' && estimatedWaitTime && (
+          <View style={styles.estimatedWaitTime}>
+            <Text style={styles.estimatedWaitTimeIcon}>⏱️</Text>
+            <Text style={styles.estimatedWaitTimeText}>
+              Est. wait: {estimatedWaitTime} min
+            </Text>
+          </View>
+        )}
+        
+        {/* Show user's position if on waitlist */}
+        {myWaitlistEntry && (
+          <View style={styles.myPositionBadge}>
+            <Text style={styles.myPositionText}>
+              You&apos;re #{myWaitlistEntry.position} in line
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
       
-      <Text style={styles.icon}>{getEquipmentIcon()}</Text>
-      
-      <Text style={[
-        styles.status,
-        { color: getStatusColor() }
-      ]}>
-        {getStatusText()}
-      </Text>
-      
-      {/* Waitlist Info */}
-      {status === 'in_use' && waitlistCount > 0 && (
-        <View style={styles.waitlistInfo}>
-          <Text style={styles.waitlistIcon}>👥</Text>
-          <Text style={styles.waitlistText}>
-            {waitlistCount} {waitlistCount === 1 ? 'person' : 'people'} waiting
-          </Text>
-        </View>
-      )}
-      
-      {/* Show user's position if on waitlist */}
-      {myWaitlistEntry && (
-        <View style={styles.myPositionBadge}>
-          <Text style={styles.myPositionText}>
-            You&apos;re #{myWaitlistEntry.position} in line
-          </Text>
-        </View>
-      )}
-      
-      {/* Waitlist Button */}
+      {/* Waitlist Button - outside the card touchable */}
       {status === 'in_use' && user && (
         <TouchableOpacity
           style={[
@@ -210,7 +235,7 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
             ? (hasMalfunction ? 'Has malfunction - use with caution' : 'Tap to start session')
             : 'Available soon'}
       </Text>
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -228,6 +253,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 220,
     borderLeftWidth: 4,
+  },
+  cardTouchable: {
+    flex: 1,
   },
   headerRow: {
     flexDirection: 'row',
@@ -327,6 +355,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  estimatedWaitTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f4fd',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  estimatedWaitTimeIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  estimatedWaitTimeText: {
+    fontSize: 12,
+    color: '#2980b9',
+    fontWeight: '500',
   },
 });
 

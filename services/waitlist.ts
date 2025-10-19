@@ -1,19 +1,19 @@
 // services/waitlist.ts
 import { db } from '@/lib/firebase';
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    increment,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    Timestamp,
-    updateDoc,
-    where
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  increment,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 import type { WaitlistEntry, WaitlistStatus } from './types';
 
@@ -48,6 +48,8 @@ export async function joinWaitlist(
       position,
       status: 'waiting' as WaitlistStatus,
       notified: false,
+      notifiedAt: null,
+      claimedAt: null,
       expiresAt: null
     };
 
@@ -187,12 +189,31 @@ export async function notifyNextInWaitlist(equipmentId: string): Promise<void> {
     await updateDoc(firstInLine.ref, {
       status: 'notified',
       notified: true,
-      expiresAt: Timestamp.fromDate(new Date(Date.now() + 10 * 60 * 1000)) // 10 minutes to claim
+      notifiedAt: Timestamp.now(),
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)) // 5 minutes to claim
     });
 
     // TODO: Send push notification to user
     // This would require expo-notifications and storing user notification tokens
     console.log(`Notified user ${firstInLine.data().userName} that equipment ${equipmentId} is available`);
+    
+    // For now, send a local notification (user would need to be in the app)
+    // In a real app, you'd send a push notification to the user's device
+    try {
+      // Import dynamically to avoid circular dependency
+      const { sendLocalNotification } = await import('./notifications');
+      await sendLocalNotification(
+        'Equipment Available! 🎉',
+        `${firstInLine.data().equipmentName || 'Equipment'} is now available. You have 5 minutes to claim it!`,
+        {
+          type: 'waitlist_notification',
+          equipmentId,
+          waitlistEntryId: firstInLine.id,
+        }
+      );
+    } catch (error) {
+      console.error('Error sending notification:', error);
+    }
   } catch (error) {
     console.error('Error notifying next in waitlist:', error);
   }
@@ -213,8 +234,20 @@ export async function claimFromWaitlist(equipmentId: string, userId: string): Pr
       throw new Error('You have not been notified yet');
     }
 
-    // Remove from waitlist
-    await deleteDoc(doc(db, WAITLIST_COLLECTION, entry.id));
+    // Mark as claimed before removing (for analytics)
+    await updateDoc(doc(db, WAITLIST_COLLECTION, entry.id), {
+      status: 'claimed',
+      claimedAt: Timestamp.now()
+    });
+
+    // Remove from waitlist after a short delay to preserve analytics data
+    setTimeout(async () => {
+      try {
+        await deleteDoc(doc(db, WAITLIST_COLLECTION, entry.id));
+      } catch (error) {
+        console.error('Error cleaning up claimed waitlist entry:', error);
+      }
+    }, 1000);
 
     // Update equipment waitlist count
     const equipmentRef = doc(db, EQUIPMENT_COLLECTION, equipmentId);
@@ -305,4 +338,152 @@ export function subscribeToUserWaitlists(
   });
   
   return unsubscribe;
+}
+
+/**
+ * Calculate estimated wait time for equipment based on historical data
+ */
+export async function getEstimatedWaitTime(equipmentId: string): Promise<number | null> {
+  try {
+    // Get completed waitlist entries for this equipment (last 30 days)
+    const thirtyDaysAgo = Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    
+    const q = query(
+      collection(db, WAITLIST_COLLECTION),
+      where('equipmentId', '==', equipmentId),
+      where('status', '==', 'claimed'),
+      where('joinedAt', '>=', thirtyDaysAgo),
+      orderBy('joinedAt', 'desc'),
+      limit(50) // Last 50 completed waits
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return null; // No historical data
+    }
+
+    // Calculate average wait time in minutes
+    let totalWaitTime = 0;
+    let validEntries = 0;
+    
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.joinedAt && data.claimedAt) {
+        const waitTimeMs = data.claimedAt.toDate().getTime() - data.joinedAt.toDate().getTime();
+        const waitTimeMinutes = waitTimeMs / (1000 * 60);
+        totalWaitTime += waitTimeMinutes;
+        validEntries++;
+      }
+    });
+    
+    if (validEntries === 0) {
+      return null;
+    }
+    
+    const averageWaitTime = totalWaitTime / validEntries;
+    return Math.round(averageWaitTime);
+  } catch (error) {
+    console.error('Error calculating estimated wait time:', error);
+    return null;
+  }
+}
+
+/**
+ * Get waitlist analytics for equipment
+ */
+export async function getWaitlistAnalytics(equipmentId: string): Promise<{
+  averageWaitTime: number | null;
+  totalWaitsCompleted: number;
+  currentWaitlistLength: number;
+}> {
+  try {
+    const [averageWaitTime, currentWaitlist] = await Promise.all([
+      getEstimatedWaitTime(equipmentId),
+      getEquipmentWaitlist(equipmentId)
+    ]);
+
+    // Count completed waits (this is approximate since we clean up entries)
+    const thirtyDaysAgo = Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    const q = query(
+      collection(db, WAITLIST_COLLECTION),
+      where('equipmentId', '==', equipmentId),
+      where('status', '==', 'claimed'),
+      where('joinedAt', '>=', thirtyDaysAgo)
+    );
+    
+    const completedSnapshot = await getDocs(q);
+    
+    return {
+      averageWaitTime,
+      totalWaitsCompleted: completedSnapshot.size,
+      currentWaitlistLength: currentWaitlist.length
+    };
+  } catch (error) {
+    console.error('Error getting waitlist analytics:', error);
+    return {
+      averageWaitTime: null,
+      totalWaitsCompleted: 0,
+      currentWaitlistLength: 0
+    };
+  }
+}
+
+/**
+ * Clean up expired waitlist entries (call this periodically)
+ */
+export async function cleanupExpiredWaitlistEntries(): Promise<void> {
+  try {
+    const now = Timestamp.now();
+    
+    // Find expired entries
+    const q = query(
+      collection(db, WAITLIST_COLLECTION),
+      where('status', '==', 'notified'),
+      where('expiresAt', '<', now)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return;
+    }
+    
+    // Mark as expired and remove
+    const updates = snapshot.docs.map(doc => 
+      updateDoc(doc.ref, { status: 'expired' })
+    );
+    
+    await Promise.all(updates);
+    
+    // Remove after a delay to preserve analytics
+    setTimeout(async () => {
+      try {
+        const deletions = snapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletions);
+        
+        // Update equipment waitlist counts
+        const equipmentUpdates = new Map<string, number>();
+        snapshot.docs.forEach(doc => {
+          const equipmentId = doc.data().equipmentId;
+          equipmentUpdates.set(equipmentId, (equipmentUpdates.get(equipmentId) || 0) + 1);
+        });
+        
+        const equipmentUpdatePromises = Array.from(equipmentUpdates.entries()).map(
+          ([equipmentId, decrement]) => 
+            updateDoc(doc(db, EQUIPMENT_COLLECTION, equipmentId), {
+              waitlistCount: increment(-decrement)
+            })
+        );
+        
+        await Promise.all(equipmentUpdatePromises);
+      } catch (error) {
+        console.error('Error cleaning up expired entries:', error);
+      }
+    }, 2000);
+    
+    console.log(`Cleaned up ${snapshot.size} expired waitlist entries`);
+  } catch (error) {
+    console.error('Error cleaning up expired waitlist entries:', error);
+  }
 }

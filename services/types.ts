@@ -119,5 +119,7 @@ export interface WaitlistEntry {
   position: number;
   status: WaitlistStatus;
   notified: boolean;
+  notifiedAt: any | null; // Firestore Timestamp
+  claimedAt: any | null; // Firestore Timestamp
   expiresAt: any | null; // Firestore Timestamp
 }
