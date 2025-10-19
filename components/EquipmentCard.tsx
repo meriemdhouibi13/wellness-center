@@ -136,12 +136,12 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({
         styles.card,
         { 
           borderLeftColor: getBorderColor(),
-          opacity: status === 'broken' ? 0.5 : (status === 'in_use' ? 0.8 : 1)
+          opacity: status === 'broken' ? 0.5 : 1
         }
       ]}
       onPress={handlePress}
-      disabled={status === 'broken' || status === 'in_use'}
-      activeOpacity={status === 'available' && !hasMalfunction ? 0.7 : 1}
+      disabled={status === 'broken'}
+      activeOpacity={0.7}
     >
       <View style={styles.headerRow}>
         <Text style={styles.typeLabel}>{type.toUpperCase()}</Text>
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     alignItems: 'center',
-    height: 220,
+    minHeight: 220,
     borderLeftWidth: 4,
   },
   headerRow: {
