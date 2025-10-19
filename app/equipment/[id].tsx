@@ -14,6 +14,10 @@ const mockEquipmentData = {
   '4': { id: '4', name: 'Meditation Cushion', type: 'meditation', status: 'available' },
   '5': { id: '5', name: 'Stationary Bike', type: 'cardio', status: 'in_use' },
   '6': { id: '6', name: 'Barbell', type: 'strength', status: 'available' },
+  // Add more test equipment for QR codes
+  'test1': { id: 'test1', name: 'Test Equipment 1', type: 'cardio', status: 'available' },
+  'test2': { id: 'test2', name: 'Test Equipment 2', type: 'strength', status: 'available' },
+  'qr1': { id: 'qr1', name: 'QR Code Test Machine', type: 'cardio', status: 'available' },
 };
 
 // Get icon based on equipment type
@@ -42,11 +46,27 @@ export default function EquipmentDetailScreen() {
   useEffect(() => {
     // Simulate API call
     setTimeout(() => {
-      const data = mockEquipmentData[equipmentId as keyof typeof mockEquipmentData];
-      if (data) {
-        setEquipment(data);
+      try {
+        // Try to get equipment data or use fallback if ID doesn't exist
+        const data = mockEquipmentData[equipmentId as keyof typeof mockEquipmentData];
+        
+        if (data) {
+          setEquipment(data);
+        } else {
+          // Set a fallback/default equipment item when ID doesn't exist
+          console.warn(`Equipment ID "${equipmentId}" not found in data`);
+          setEquipment({
+            id: equipmentId || 'unknown',
+            name: `Unknown Equipment (${equipmentId || 'N/A'})`,
+            type: 'unknown',
+            status: 'available'
+          });
+        }
+      } catch (error) {
+        console.error('Error loading equipment data:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }, 500);
   }, [equipmentId]);
   
