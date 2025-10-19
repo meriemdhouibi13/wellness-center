@@ -5,9 +5,21 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  
+  // Check if user is admin on mount
+  React.useEffect(() => {
+    AsyncStorage.getItem('auth:session').then((sessionStr) => {
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr);
+        setIsAdmin(session.role === 'admin');
+      }
+    });
+  }, []);
 
   return (
     <Tabs
@@ -56,6 +68,16 @@ export default function TabLayout() {
         options={{
           title: 'Coach',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="figure.walk" color={color} />,
+        }}
+      />
+      
+      {/* Admin tab - will be visible for admin users */}
+      <Tabs.Screen
+        name="admin-seed"
+        options={{
+          title: 'Admin',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear" color={color} />,
+          href: isAdmin ? '/admin-seed' : null, // Only show tab if user is admin
         }}
       />
     </Tabs>
