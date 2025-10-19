@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { FitnessClass, ClassRegistration } from '@/services/types';
-import { 
-  getClassById, 
-  getUserClassRegistration, 
-  registerForClass, 
-  cancelClassRegistration 
-} from '@/services/classes';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+    cancelClassRegistration,
+    getClassById,
+    getUserClassRegistration,
+    registerForClass
+} from '@/services/classes';
+import { ClassRegistration, FitnessClass } from '@/services/types';
 
 export default function ClassDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

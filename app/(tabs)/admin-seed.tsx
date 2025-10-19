@@ -1,15 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Stack } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { seedClasses, clearDemoData } from '@/services/seed';
+import { clearDemoData, seedClasses } from '@/services/seed';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Helper function to determine icon for class type
+const getIconForClass = (className: string) => {
+  const name = className.toLowerCase();
+  if (name.includes('yoga')) return 'body-outline';
+  if (name.includes('meditation')) return 'medical-outline';
+  if (name.includes('hiit') || name.includes('cardio')) return 'flame-outline';
+  if (name.includes('strength') || name.includes('crossfit')) return 'barbell-outline';
+  if (name.includes('cycling') || name.includes('spin')) return 'bicycle-outline';
+  if (name.includes('dance') || name.includes('zumba')) return 'musical-notes-outline';
+  if (name.includes('pilates') || name.includes('barre')) return 'fitness-outline';
+  if (name.includes('stretch')) return 'expand-outline';
+  if (name.includes('kickbox')) return 'hand-right-outline';
+  return 'calendar-outline';
+};
 
 export default function AdminSeedScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState('');
   const [user, setUser] = useState<{ uid: string } | null>(null);
+  const [generatedClasses, setGeneratedClasses] = useState<string[]>([]);
+  const [lastOperation, setLastOperation] = useState<'generate' | 'clear' | null>(null);
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   // Load user on mount
   useEffect(() => {
@@ -34,13 +54,35 @@ export default function AdminSeedScreen() {
       return;
     }
     
+    // Reset animation
+    fadeAnim.setValue(0);
     setIsLoading(true);
     setResult('');
+    setGeneratedClasses([]);
     
     try {
+      const sampleClassTitles = [
+        'Morning Yoga Flow', 'HIIT Challenge', 'Evening Meditation', 'Power Cycling', 
+        'Strength Training', 'Pilates Core', 'Zumba', 'Spin Class', 'Meditation',
+        'Kickboxing', 'Barre Fitness', 'Gentle Yoga', 'CrossFit', 'Dance Cardio', 'Stretch & Recover'
+      ];
+      
       const count = await seedClasses();
       setResult(`Successfully generated ${count} sample classes!`);
-      Alert.alert('Success', `Generated ${count} sample classes for the next 7 days.`);
+      setGeneratedClasses(sampleClassTitles);
+      setLastOperation('generate');
+      
+      // Animate the generated classes container
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+      
+      Alert.alert(
+        'Success', 
+        `Generated ${count} sample classes for the next 7 days. You can now view them in the Classes tab.`
+      );
     } catch (error: any) {
       console.error('Error generating classes:', error);
       setResult(`Error: ${error.message}`);
@@ -68,15 +110,28 @@ export default function AdminSeedScreen() {
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={[styles.button, styles.primaryButton]}
+            style={[
+              styles.button, 
+              styles.primaryButton,
+              isLoading && { opacity: 0.7 }
+            ]}
             onPress={handleGenerateSampleClasses}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Generate Sample Classes</Text>
+            <View style={styles.buttonInner}>
+              <Text style={styles.buttonText}>Generate Sample Classes</Text>
+              {isLoading && lastOperation === 'generate' && (
+                <ActivityIndicator size="small" color="white" style={{marginLeft: 8}} />
+              )}
+            </View>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.button, styles.dangerButton]}
+            style={[
+              styles.button, 
+              styles.dangerButton,
+              isLoading && { opacity: 0.7 }
+            ]}
             onPress={() => {
               Alert.alert(
                 'Clear Demo Data',
@@ -91,7 +146,9 @@ export default function AdminSeedScreen() {
                       try {
                         await clearDemoData();
                         setResult('Successfully cleared all demo data');
-                        Alert.alert('Success', 'All demo data has been removed');
+                        setGeneratedClasses([]);
+                        setLastOperation('clear');
+                        Alert.alert('Success', 'All demo data has been removed from the database');
                       } catch (error: any) {
                         setResult(`Error: ${error.message}`);
                         Alert.alert('Error', `Failed to clear data: ${error.message}`);
@@ -105,20 +162,41 @@ export default function AdminSeedScreen() {
             }}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Clear Demo Data</Text>
+            <View style={styles.buttonInner}>
+              <Text style={styles.buttonText}>Clear Demo Data</Text>
+              {isLoading && lastOperation === 'clear' && (
+                <ActivityIndicator size="small" color="white" style={{marginLeft: 8}} />
+              )}
+            </View>
           </TouchableOpacity>
         </View>
 
         {isLoading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0066cc" />
-            <Text style={styles.loadingText}>Processing...</Text>
+            <Text style={styles.loadingText}>
+              {lastOperation === 'generate' ? 'Generating sample classes...' : 
+               lastOperation === 'clear' ? 'Clearing demo data...' : 'Processing...'}
+            </Text>
           </View>
         )}
 
         {result !== '' && (
           <View style={styles.resultContainer}>
-            <Text style={styles.resultText}>{result}</Text>
+            <View style={styles.resultRow}>
+              {!result.includes('Error') && (
+                <Ionicons name="checkmark-circle" size={20} color="#28a745" style={styles.resultIcon} />
+              )}
+              {result.includes('Error') && (
+                <Ionicons name="alert-circle" size={20} color="#dc3545" style={styles.resultIcon} />
+              )}
+              <Text style={[
+                styles.resultText, 
+                result.includes('Error') ? styles.errorText : styles.successText
+              ]}>
+                {result}
+              </Text>
+            </View>
           </View>
         )}
         
@@ -132,6 +210,46 @@ export default function AdminSeedScreen() {
             Classes have different instructors, capacity limits, and some include waitlist functionality.
           </Text>
         </View>
+        
+        {generatedClasses.length > 0 && (
+          <Animated.View style={[
+            styles.classesContainer,
+            { opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [20, 0]
+            })}] }
+          ]}>
+            <Text style={styles.classesTitle}>Generated Classes</Text>
+            <Text style={styles.classesSubtitle}>The following classes were created successfully:</Text>
+            
+            {generatedClasses.map((className, index) => (
+              <View key={index} style={styles.classItem}>
+                <View style={styles.classItemHeader}>
+                  <Ionicons 
+                    name={getIconForClass(className) as any} 
+                    size={18} 
+                    color="#28a745" 
+                    style={styles.classIcon}
+                  />
+                  <Text style={styles.classItemText}>{className}</Text>
+                </View>
+                <Text style={styles.classItemDate}>
+                  Available for the next 7 days at various times
+                </Text>
+              </View>
+            ))}
+            
+            <TouchableOpacity
+              style={styles.viewClassesButton}
+              onPress={() => {
+                // Navigate directly to classes tab
+                router.navigate('/classes');
+              }}
+            >
+              <Text style={styles.viewClassesButtonText}>View in Classes Tab</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </View>
     </ScrollView>
   );
@@ -144,6 +262,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 60,
   },
   section: {
     backgroundColor: 'white',
@@ -178,6 +297,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  buttonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   primaryButton: {
     backgroundColor: '#0066cc',
   },
@@ -203,9 +327,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f1f1',
     borderRadius: 6,
   },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  resultIcon: {
+    marginRight: 8,
+  },
   resultText: {
     fontSize: 14,
-    color: '#333',
+    flex: 1,
+  },
+  successText: {
+    color: '#28a745',
+  },
+  errorText: {
+    color: '#dc3545',
   },
   infoContainer: {
     marginTop: 24,
@@ -226,5 +363,69 @@ const styles = StyleSheet.create({
     color: '#444',
     marginBottom: 8,
     lineHeight: 20,
+  },
+  classesContainer: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  classesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#28a745',
+  },
+  classesSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  classItem: {
+    padding: 10,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#28a745',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  classItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  classIcon: {
+    marginRight: 8,
+  },
+  classItemText: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
+  },
+  classItemDate: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+    marginLeft: 26,
+  },
+  viewClassesButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  viewClassesButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserUpcomingRegistrations, cancelClassRegistration } from '@/services/classes';
+import { cancelClassRegistration, getUserUpcomingRegistrations } from '@/services/classes';
 import { ClassRegistration, FitnessClass } from '@/services/types';
 
 type RegistrationWithClass = {

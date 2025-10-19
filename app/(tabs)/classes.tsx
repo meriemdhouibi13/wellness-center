@@ -1,13 +1,20 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Calendar, DateData } from 'react-native-calendars';
 
-import { FitnessClass, ClassCategory } from '@/services/types';
-import { getUpcomingClasses, getClassesByCategory, getClassesByDate } from '@/services/classes';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+    getAvailableDatesForCategory,
+    getClassesByCategory,
+    getClassesByDate,
+    getClassesByDateAndCategory,
+    getUpcomingClasses
+} from '@/services/classes';
+import { ClassCategory, FitnessClass } from '@/services/types';
 
 // Categories with icons for filtering
 const CATEGORIES: { label: string; value: ClassCategory; icon: string }[] = [
@@ -27,11 +34,13 @@ export default function ClassesScreen() {
   const router = useRouter();
   
   const [loading, setLoading] = useState<boolean>(true);
+  const [calendarLoading, setCalendarLoading] = useState<boolean>(false);
   const [classes, setClasses] = useState<FitnessClass[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<ClassCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<'upcoming' | 'calendar'>('upcoming');
+  const [markedDates, setMarkedDates] = useState<{[date: string]: {marked: boolean; dotColor: string}}>({});
   
   // Format selected date for display
   const formattedDate = useMemo(() => {
@@ -52,13 +61,11 @@ export default function ClassesScreen() {
             fetchedClasses = await getClassesByCategory(selectedCategory);
           }
         } else {
-          fetchedClasses = await getClassesByDate(selectedDate);
-          
-          // Apply category filter if not "all"
-          if (selectedCategory !== 'all') {
-            fetchedClasses = fetchedClasses.filter(
-              c => c.category === selectedCategory
-            );
+          // Using the new function with compound index support
+          if (selectedCategory === 'all') {
+            fetchedClasses = await getClassesByDate(selectedDate);
+          } else {
+            fetchedClasses = await getClassesByDateAndCategory(selectedDate, selectedCategory);
           }
         }
         
@@ -73,13 +80,47 @@ export default function ClassesScreen() {
     fetchClasses();
   }, [selectedDate, selectedCategory, viewMode]);
   
-  // Handle date change
+  // Load available dates for calendar view
+  useEffect(() => {
+    async function loadAvailableDates() {
+      if (viewMode !== 'calendar') return;
+      
+      setCalendarLoading(true);
+      try {
+        const now = new Date();
+        const month = now.getMonth();
+        const year = now.getFullYear();
+        
+        const dates = await getAvailableDatesForCategory(
+          selectedCategory, 
+          month,
+          year
+        );
+        
+        setMarkedDates(dates);
+      } catch (error) {
+        console.error('Error loading available dates:', error);
+      } finally {
+        setCalendarLoading(false);
+      }
+    }
+    
+    loadAvailableDates();
+  }, [selectedCategory, viewMode]);
+  
+  // Handle date change from DateTimePicker
   const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) {
       setSelectedDate(selectedDate);
       setViewMode('calendar');
     }
+  };
+  
+  // Handle date change from Calendar component
+  const onCalendarDateSelect = (date: DateData) => {
+    const selectedDate = new Date(date.timestamp);
+    setSelectedDate(selectedDate);
   };
   
   // Group classes by time for better organization
@@ -213,17 +254,33 @@ export default function ClassesScreen() {
         </TouchableOpacity>
       </View>
       
-      {/* Date Selector (for Calendar view) */}
+      {/* Calendar View */}
       {viewMode === 'calendar' && (
-        <View style={styles.dateSelector}>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Ionicons name="calendar-outline" size={20} color="#007AFF" />
-            <Text style={styles.dateText}>{formattedDate}</Text>
-            <Ionicons name="chevron-down" size={20} color="#007AFF" />
-          </TouchableOpacity>
+        <View style={styles.calendarContainer}>
+          <Calendar
+            current={selectedDate.toISOString()}
+            markedDates={{
+              ...markedDates,
+              [format(selectedDate, 'yyyy-MM-dd')]: {
+                selected: true,
+                marked: markedDates[format(selectedDate, 'yyyy-MM-dd')]?.marked || false,
+                selectedColor: '#007AFF',
+                dotColor: markedDates[format(selectedDate, 'yyyy-MM-dd')]?.dotColor || '#28a745'
+              }
+            }}
+            onDayPress={onCalendarDateSelect}
+            theme={{
+              todayTextColor: '#007AFF',
+              arrowColor: '#007AFF',
+              dotColor: '#28a745',
+              selectedDotColor: '#ffffff'
+            }}
+          />
+          
+          <View style={styles.dateInfo}>
+            <Ionicons name="calendar" size={20} color="#007AFF" />
+            <Text style={styles.dateInfoText}>{formattedDate}</Text>
+          </View>
           
           {showDatePicker && (
             <DateTimePicker
@@ -365,6 +422,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 16,
   },
+  calendarContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,6 +449,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 8,
     color: '#343a40',
+  },
+  dateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  dateInfoText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 8,
+    fontWeight: '500',
   },
   categoryScroll: {
     maxHeight: 90,

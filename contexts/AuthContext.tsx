@@ -1,7 +1,7 @@
+import { emailPasswordSignIn, emailPasswordSignUp, signOutUser, subscribeAuth } from '@/services/auth';
+import type { UserProfile, UserRole } from '@/services/types';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 type UserLike = { uid: string; email?: string | null; displayName?: string | null };
-import type { UserProfile, UserRole } from '@/services/types';
-import { emailPasswordSignIn, emailPasswordSignUp, signOutUser, subscribeAuth } from '@/services/auth';
 
 interface AuthContextValue {
   user: UserLike | null;
@@ -53,6 +53,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) {
+    // Return a safe noop fallback to avoid crashing components that
+    // attempt to access auth before the provider is mounted (e.g. during
+    // initial routing). Components should handle a null user/profile.
+    return {
+      user: null,
+      profile: null,
+      loading: false,
+      async signIn() { throw new Error('AuthProvider not initialized'); },
+      async signUp() { throw new Error('AuthProvider not initialized'); },
+      async signOut() { /* noop */ },
+      hasRole() { return false; },
+    } as any;
+  }
   return ctx;
 }

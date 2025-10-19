@@ -1,7 +1,7 @@
 // scripts/seed-classes.ts
-import { Timestamp } from 'firebase/firestore';
 import { createClass } from '@/services/classes';
-import { FitnessClass, ClassCategory, ClassLevel } from '@/services/types';
+import { ClassCategory, ClassLevel, FitnessClass } from '@/services/types';
+import { Timestamp } from 'firebase/firestore';
 
 // Helper function to create a date with specific time
 const createDateTime = (

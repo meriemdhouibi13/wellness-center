@@ -1,21 +1,22 @@
 // services/classes.ts
 import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  onSnapshot,
-  orderBy,
-  query,
-  Timestamp,
-  updateDoc,
-  where
+    addDoc,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    increment,
+    onSnapshot,
+    orderBy,
+    query,
+    Timestamp,
+    updateDoc,
+    where
 } from 'firebase/firestore';
-import { ClassRegistration, FitnessClass, RegistrationStatus } from './types';
 import { sendLocalNotification } from './notifications';
+import { ClassRegistration, FitnessClass, RegistrationStatus } from './types';
 
 const CLASSES_COLLECTION = 'classes';
 const REGISTRATIONS_COLLECTION = 'class-registrations';
@@ -27,10 +28,11 @@ export async function getUpcomingClasses(): Promise<FitnessClass[]> {
   try {
     const now = Timestamp.now();
     
+    // Order is important for compound index: status, startTime
     const q = query(
       collection(db, CLASSES_COLLECTION),
-      where('startTime', '>', now),
       where('status', '==', 'scheduled'),
+      where('startTime', '>', now),
       orderBy('startTime', 'asc')
     );
     
@@ -52,11 +54,12 @@ export async function getClassesByCategory(category: string): Promise<FitnessCla
   try {
     const now = Timestamp.now();
     
+    // Order is important for compound index: category, status, startTime
     const q = query(
       collection(db, CLASSES_COLLECTION),
-      where('startTime', '>', now),
       where('category', '==', category),
       where('status', '==', 'scheduled'),
+      where('startTime', '>', now),
       orderBy('startTime', 'asc')
     );
     
@@ -84,11 +87,12 @@ export async function getClassesByDate(date: Date): Promise<FitnessClass[]> {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
     
+    // Order is important for compound index: status, startTime
     const q = query(
       collection(db, CLASSES_COLLECTION),
+      where('status', '==', 'scheduled'),
       where('startTime', '>=', Timestamp.fromDate(startOfDay)),
       where('startTime', '<=', Timestamp.fromDate(endOfDay)),
-      where('status', '==', 'scheduled'),
       orderBy('startTime', 'asc')
     );
     
@@ -100,6 +104,110 @@ export async function getClassesByDate(date: Date): Promise<FitnessClass[]> {
   } catch (error) {
     console.error('Error fetching classes by date:', error);
     return [];
+  }
+}
+
+/**
+ * Get classes for a specific date and category
+ * Requires a compound index on Firestore for (startTime, category, status)
+ */
+export async function getClassesByDateAndCategory(
+  date: Date,
+  category: string
+): Promise<FitnessClass[]> {
+  try {
+    // Start of the selected day
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    // End of the selected day
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Order is important for compound index: category, status, startTime
+    const q = query(
+      collection(db, CLASSES_COLLECTION),
+      where('category', '==', category),
+      where('status', '==', 'scheduled'),
+      where('startTime', '>=', Timestamp.fromDate(startOfDay)),
+      where('startTime', '<=', Timestamp.fromDate(endOfDay)),
+      orderBy('startTime', 'asc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as FitnessClass));
+  } catch (error) {
+    console.error(`Error fetching ${category} classes for date:`, error);
+    return [];
+  }
+}
+
+/**
+ * Get all available dates for a specific category in a month
+ * Returns a map of dates with available classes
+ */
+export async function getAvailableDatesForCategory(
+  category: string,
+  month: number, // 0-indexed (January is 0)
+  year: number
+): Promise<{[date: string]: {marked: boolean; dotColor: string}}> {
+  try {
+    const now = new Date();
+    
+    // Start of the month
+    const startOfMonth = new Date(year, month, 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    // End of the month (start of next month - 1ms)
+    const endOfMonth = new Date(year, month + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
+    
+    // Only show future dates or today
+    const effectiveStart = now > startOfMonth ? now : startOfMonth;
+    
+    let q;
+    if (category === 'all') {
+      // Query for all categories - needs index on status + startTime
+      q = query(
+        collection(db, CLASSES_COLLECTION),
+        where('status', '==', 'scheduled'),
+        where('startTime', '>=', Timestamp.fromDate(effectiveStart)),
+        where('startTime', '<=', Timestamp.fromDate(endOfMonth)),
+        orderBy('startTime', 'asc')
+      );
+    } else {
+      // Query for specific category - needs compound index on category + status + startTime
+      q = query(
+        collection(db, CLASSES_COLLECTION),
+        where('category', '==', category),
+        where('status', '==', 'scheduled'),
+        where('startTime', '>=', Timestamp.fromDate(effectiveStart)),
+        where('startTime', '<=', Timestamp.fromDate(endOfMonth)),
+        orderBy('startTime', 'asc')
+      );
+    }
+    
+    const snapshot = await getDocs(q);
+    const markedDates: {[date: string]: {marked: boolean; dotColor: string}} = {};
+    
+    snapshot.docs.forEach(doc => {
+      const classData = doc.data() as FitnessClass;
+      const classDate = classData.startTime.toDate();
+      const dateString = format(classDate, 'yyyy-MM-dd');
+      
+      markedDates[dateString] = {
+        marked: true,
+        dotColor: '#28a745' // Green dot
+      };
+    });
+    
+    return markedDates;
+  } catch (error) {
+    console.error(`Error fetching available dates for ${category}:`, error);
+    return {};
   }
 }
 
