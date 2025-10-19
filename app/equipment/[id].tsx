@@ -1,5 +1,7 @@
 // Modify app/equipment/[id].tsx to handle starting sessions
 
+import EquipmentUsageAnalytics from '@/components/EquipmentUsageAnalytics';
+import { logEquipmentUsageEnd, logEquipmentUsageStart } from '@/services/equipment';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -93,6 +95,16 @@ export default function EquipmentDetailScreen() {
       active: true, 
       startTime: new Date() 
     });
+    // log usage start (fire-and-forget)
+    (async () => {
+      try {
+        const log = await logEquipmentUsageStart(equipment.id, null);
+        // attach usage id to session state so we can end it properly
+        setSession((s) => ({ ...s, usageId: log.id } as any));
+      } catch (e) {
+        console.warn('Failed to log usage start', e);
+      }
+    })();
     
     // Update equipment status locally
     if (equipment) {
@@ -106,6 +118,14 @@ export default function EquipmentDetailScreen() {
   // End the current session
   const endSession = () => {
     // In a real app, you would make an API call here
+    (async () => {
+      try {
+        const usageId = (session as any).usageId;
+        if (usageId) await logEquipmentUsageEnd(equipment.id, usageId);
+      } catch (e) {
+        console.warn('Failed to log usage end', e);
+      }
+    })();
     setSession({ active: false });
     
     // Update equipment status locally
@@ -225,6 +245,8 @@ export default function EquipmentDetailScreen() {
           <Text style={styles.infoText}>• 30 minute time limit during peak hours</Text>
           <Text style={styles.infoText}>• Report any equipment issues to staff</Text>
         </View>
+
+        <EquipmentUsageAnalytics equipmentId={equipment.id} days={14} />
       </View>
     </View>
   );
